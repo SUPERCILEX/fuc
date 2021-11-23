@@ -200,6 +200,7 @@ dependencies = [
  "criterion",
  "memmap2",
  "nix",
+ "num_cpus",
  "rand",
  "tempfile",
 ]

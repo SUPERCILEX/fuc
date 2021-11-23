@@ -3,8 +3,12 @@ use std::{
     alloc::Layout,
     fs::{copy, File, OpenOptions},
     io::{BufRead, BufReader, Write},
-    os::unix::{fs::OpenOptionsExt, io::AsRawFd},
+    os::unix::{
+        fs::{FileExt, OpenOptionsExt},
+        io::AsRawFd,
+    },
     path::PathBuf,
+    thread,
     time::Duration,
 };
 
@@ -244,6 +248,49 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         BufReader::with_capacity(readahead_size, File::open(files.from).unwrap());
 
                     write_from_buffer(files.to, reader);
+
+                    files.dir
+                },
+                BatchSize::PerIteration,
+            )
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("buffered_parallel", num_bytes),
+        &num_bytes,
+        |b, num_bytes| {
+            b.iter_batched(
+                || NormalTempFile::create(*num_bytes as usize, direct_io),
+                |files| {
+                    let threads = num_cpus::get() as u64;
+                    let chunk_size = num_bytes / threads;
+
+                    let from = File::open(files.from).unwrap();
+                    let to = File::create(files.to).unwrap();
+                    advise(&from);
+                    to.set_len(*num_bytes).unwrap();
+
+                    let mut results = Vec::with_capacity(threads as usize);
+                    for i in 0..threads {
+                        let from = from.try_clone().unwrap();
+                        let to = to.try_clone().unwrap();
+
+                        results.push(thread::spawn(move || {
+                            let mut buf = Vec::with_capacity(chunk_size as usize);
+                            // We write those bytes immediately after and dropping u8s does nothing
+                            #[allow(clippy::uninit_vec)]
+                            unsafe {
+                                buf.set_len(chunk_size as usize);
+                            }
+
+                            from.read_exact_at(&mut buf, i * chunk_size).unwrap();
+                            to.write_all_at(&buf, i * chunk_size).unwrap();
+                        }));
+                    }
+                    for handle in results {
+                        handle.join().unwrap();
+                    }
 
                     files.dir
                 },
