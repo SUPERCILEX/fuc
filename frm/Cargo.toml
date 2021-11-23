@@ -1,0 +1,10 @@
+[package]
+name = "frm"
+version = "0.1.0"
+authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
+edition = "2021"
+description = "Fast rm provides an alternative to rm that focuses on maximizing performance."
+repository = "https://github.com/SUPERCILEX/fuc"
+keywords = ["tools", "files", "rm"]
+categories = ["command-line-utilities", "development-tools", "filesystem"]
+license = "Apache-2.0"
