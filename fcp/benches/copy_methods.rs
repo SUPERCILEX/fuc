@@ -38,20 +38,7 @@ impl NormalTempFile {
         let dir = tempdir().unwrap();
         let from = dir.path().join("from");
 
-        let mut buf = if direct_io {
-            let layout = Layout::from_size_align(bytes, 1 << 12).unwrap();
-            let ptr = unsafe { alloc::alloc(layout) };
-            unsafe { Vec::<u8>::from_raw_parts(ptr, bytes, bytes) }
-        } else {
-            let mut v = Vec::with_capacity(bytes);
-            // We write those bytes immediately after and dropping u8s does nothing
-            #[allow(clippy::uninit_vec)]
-            unsafe {
-                v.set_len(bytes);
-            }
-            v
-        };
-        thread_rng().fill_bytes(buf.as_mut_slice());
+        let buf = create_random_buffer(bytes, direct_io);
 
         let mut options = OpenOptions::new();
         options.write(true).create(true).truncate(true);
@@ -126,6 +113,68 @@ fn empty_files(c: &mut Criterion) {
             BatchSize::LargeInput,
         )
     });
+}
+
+fn just_writes(c: &mut Criterion) {
+    let mut group = c.benchmark_group("just_writes");
+
+    for num_bytes in [1 << 20] {
+        group.throughput(Throughput::Bytes(num_bytes));
+
+        group.bench_with_input(
+            BenchmarkId::new("open_memcache", num_bytes),
+            &num_bytes,
+            |b, num_bytes| {
+                b.iter_batched(
+                    || {
+                        let dir = tempdir().unwrap();
+                        let buf = create_random_buffer(*num_bytes as usize, false);
+
+                        (dir, buf)
+                    },
+                    |(dir, buf)| {
+                        File::create(dir.path().join("file"))
+                            .unwrap()
+                            .write_all(&buf)
+                            .unwrap();
+
+                        (dir, buf)
+                    },
+                    BatchSize::PerIteration,
+                )
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("open_nocache", num_bytes),
+            &num_bytes,
+            |b, num_bytes| {
+                b.iter_batched(
+                    || {
+                        let dir = tempdir().unwrap();
+                        let buf = create_random_buffer(*num_bytes as usize, true);
+
+                        (dir, buf)
+                    },
+                    |(dir, buf)| {
+                        let mut out = OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .truncate(true)
+                            .custom_flags(O_DIRECT)
+                            .open(dir.path().join("file"))
+                            .unwrap();
+                        out.set_len(*num_bytes).unwrap();
+
+                        out.write_all(&buf).unwrap();
+
+                        (dir, buf)
+                    },
+                    BatchSize::PerIteration,
+                )
+            },
+        );
+    }
 }
 
 fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: bool) {
@@ -326,6 +375,24 @@ fn advise(_file: &File) {
     // posix_fadvise(file.as_raw_fd(), 0, 0, POSIX_FADV_SEQUENTIAL).unwrap();
 }
 
+fn create_random_buffer(bytes: usize, direct_io: bool) -> Vec<u8> {
+    let mut buf = if direct_io {
+        let layout = Layout::from_size_align(bytes, 1 << 12).unwrap();
+        let ptr = unsafe { alloc::alloc(layout) };
+        unsafe { Vec::<u8>::from_raw_parts(ptr, bytes, bytes) }
+    } else {
+        let mut v = Vec::with_capacity(bytes);
+        // We write those bytes immediately after and dropping u8s does nothing
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+            v.set_len(bytes);
+        }
+        v
+    };
+    thread_rng().fill_bytes(buf.as_mut_slice());
+    buf
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().noise_threshold(0.02).warm_up_time(Duration::from_secs(1));
@@ -333,5 +400,6 @@ criterion_group! {
     with_memcache,
     initially_uncached,
     empty_files,
+    just_writes,
 }
 criterion_main!(benches);
