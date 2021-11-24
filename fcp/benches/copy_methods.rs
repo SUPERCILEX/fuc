@@ -2,7 +2,7 @@ use std::{
     alloc,
     alloc::Layout,
     fs::{copy, File, OpenOptions},
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     os::unix::{
         fs::{FileExt, OpenOptionsExt},
         io::AsRawFd,
@@ -291,6 +291,29 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                     for handle in results {
                         handle.join().unwrap();
                     }
+
+                    files.dir
+                },
+                BatchSize::PerIteration,
+            )
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("buffered_entire_file", num_bytes),
+        &num_bytes,
+        |b, num_bytes| {
+            b.iter_batched(
+                || NormalTempFile::create(*num_bytes as usize, direct_io),
+                |files| {
+                    let mut from = File::open(files.from).unwrap();
+                    let mut to = File::create(files.to).unwrap();
+                    advise(&from);
+                    to.set_len(*num_bytes).unwrap();
+
+                    let mut buf = Vec::with_capacity(*num_bytes as usize);
+                    from.read_to_end(&mut buf).unwrap();
+                    to.write_all(&buf).unwrap();
 
                     files.dir
                 },
