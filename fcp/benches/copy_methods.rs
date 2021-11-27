@@ -3,11 +3,8 @@ use std::{
     alloc::Layout,
     fs::{copy, File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
-    os::unix::{
-        fs::{FileExt, OpenOptionsExt},
-        io::AsRawFd,
-    },
-    path::PathBuf,
+    os::unix::{fs::FileExt, io::AsRawFd},
+    path::{Path, PathBuf},
     thread,
     time::Duration,
 };
@@ -18,11 +15,6 @@ use criterion::{
     Criterion, Throughput,
 };
 use memmap2::{Mmap, MmapOptions};
-use nix::{
-    fcntl::{fallocate, FallocateFlags},
-    libc::{off_t, O_DIRECT},
-    sys::stat::{mknod, Mode, SFlag},
-};
 use rand::{thread_rng, RngCore};
 use tempfile::{tempdir, TempDir};
 
@@ -44,12 +36,7 @@ impl NormalTempFile {
 
         let buf = create_random_buffer(bytes, direct_io);
 
-        let mut options = OpenOptions::new();
-        options.write(true).create(true).truncate(true);
-        if direct_io {
-            options.custom_flags(O_DIRECT);
-        }
-        options.open(&from).unwrap().write_all(&buf).unwrap();
+        open_standard(&from, direct_io).write_all(&buf).unwrap();
 
         NormalTempFile {
             to: dir.path().join("to"),
@@ -106,10 +93,12 @@ fn empty_files(c: &mut Criterion) {
         )
     });
 
+    #[cfg(target_os = "linux")]
     group.bench_function("mknod", |b| {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
+                use nix::sys::stat::{mknod, Mode, SFlag};
                 mknod(files.to.as_path(), SFlag::S_IFREG, Mode::empty(), 0).unwrap();
 
                 files.dir
@@ -161,13 +150,7 @@ fn just_writes(c: &mut Criterion) {
                         (dir, buf)
                     },
                     |(dir, buf)| {
-                        let mut out = OpenOptions::new()
-                            .write(true)
-                            .create(true)
-                            .truncate(true)
-                            .custom_flags(O_DIRECT)
-                            .open(dir.path().join("file"))
-                            .unwrap();
+                        let mut out = open_standard(dir.path().join("file").as_ref(), true);
                         out.set_len(*num_bytes).unwrap();
 
                         out.write_all(&buf).unwrap();
@@ -365,6 +348,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
         },
     );
 
+    #[cfg(target_os = "linux")]
     group.bench_with_input(
         BenchmarkId::new("mmap_read_only_fallocate", num_bytes),
         &num_bytes,
@@ -416,6 +400,31 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     );
 }
 
+fn open_standard(path: &Path, direct_io: bool) -> File {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+
+    #[cfg(target_os = "linux")]
+    if direct_io {
+        use nix::libc::O_DIRECT;
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(O_DIRECT);
+    }
+
+    let file = options.open(path).unwrap();
+
+    #[cfg(target_os = "macos")]
+    if direct_io {
+        use nix::{
+            errno::Errno,
+            libc::{fcntl, F_NOCACHE},
+        };
+        Errno::result(unsafe { fcntl(file.as_raw_fd(), F_NOCACHE) }).unwrap();
+    }
+
+    file
+}
+
 fn write_from_buffer(to: PathBuf, mut reader: BufReader<File>) {
     advise(reader.get_ref());
     let mut to = File::create(to).unwrap();
@@ -436,7 +445,12 @@ fn write_from_buffer(to: PathBuf, mut reader: BufReader<File>) {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn allocate(file: &File, len: u64) {
+    use nix::{
+        fcntl::{fallocate, FallocateFlags},
+        libc::off_t,
+    };
     fallocate(file.as_raw_fd(), FallocateFlags::empty(), 0, len as off_t).unwrap();
 }
 
