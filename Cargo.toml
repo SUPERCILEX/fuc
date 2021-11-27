@@ -2,8 +2,8 @@ cargo-features = ["strip"]
 
 [workspace]
 members = [
-    "frm",
-    "fcp",
+    "rmz",
+    "cpz",
 ]
 
 [profile.release]

@@ -85,6 +85,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpz"
+version = "0.1.0"
+dependencies = [
+ "cache-size",
+ "criterion",
+ "memmap2",
+ "nix",
+ "num_cpus",
+ "rand",
+ "tempfile",
+]
+
+[[package]]
 name = "criterion"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -191,23 +204,6 @@ name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
-
-[[package]]
-name = "fcp"
-version = "0.1.0"
-dependencies = [
- "cache-size",
- "criterion",
- "memmap2",
- "nix",
- "num_cpus",
- "rand",
- "tempfile",
-]
-
-[[package]]
-name = "frm"
-version = "0.1.0"
 
 [[package]]
 name = "getrandom"
@@ -508,6 +504,10 @@ checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "rmz"
+version = "0.1.0"
 
 [[package]]
 name = "rustc_version"
