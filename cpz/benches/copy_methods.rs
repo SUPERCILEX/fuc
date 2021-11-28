@@ -69,11 +69,11 @@ fn empty_files(c: &mut Criterion) {
 
     group.throughput(Throughput::Elements(1));
 
-    group.bench_function("copy_regular_files", |b| {
+    group.bench_function("copy_file_range", |b| {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
-                // Uses the copy_regular_files syscall on Linux
+                // Uses the copy_file_range syscall on Linux
                 copy(files.from, files.to).unwrap();
                 files.dir
             },
@@ -168,13 +168,13 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.throughput(Throughput::Bytes(num_bytes));
 
     group.bench_with_input(
-        BenchmarkId::new("copy_regular_files", num_bytes),
+        BenchmarkId::new("copy_file_range", num_bytes),
         &num_bytes,
         |b, num_bytes| {
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes as usize, direct_io),
                 |files| {
-                    // Uses the copy_regular_files syscall on Linux
+                    // Uses the copy_file_range syscall on Linux
                     copy(files.from, files.to).unwrap();
                     files.dir
                 },
