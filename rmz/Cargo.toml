@@ -8,3 +8,9 @@ repository = "https://github.com/SUPERCILEX/fuc"
 keywords = ["tools", "files", "rm"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1.0.51"
+clap = { version = "3.0.0-rc.4", features = ["derive", "wrap_help"] }
+exitcode = "1.1.2"
+fuc_core = { path = "../fuc_core" }

@@ -2,8 +2,10 @@ cargo-features = ["strip"]
 
 [workspace]
 members = [
-    "rmz",
     "cpz",
+    "fuc_core",
+    "fuc_engine",
+    "rmz",
 ]
 
 [profile.release]

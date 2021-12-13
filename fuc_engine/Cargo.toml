@@ -1,0 +1,10 @@
+[package]
+name = "fuc_engine"
+version = "0.1.0"
+authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
+edition = "2021"
+description = "Engine for the FUCing project."
+repository = "https://github.com/SUPERCILEX/fuc"
+keywords = ["tools", "files"]
+categories = ["filesystem"]
+license = "Apache-2.0"
