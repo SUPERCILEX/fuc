@@ -26,10 +26,12 @@ struct NormalTempFile {
 }
 
 impl NormalTempFile {
-    fn create(bytes: usize, direct_io: bool) -> NormalTempFile {
-        if direct_io && bytes % (1 << 12) != 0 {
-            panic!("Num bytes ({}) must be divisible by 2^12", bytes);
-        }
+    fn create(bytes: usize, direct_io: bool) -> Self {
+        assert!(
+            !direct_io || bytes % (1 << 12) == 0,
+            "Num bytes ({}) must be divisible by 2^12",
+            bytes
+        );
 
         let dir = tempdir().unwrap();
         let from = dir.path().join("from");
@@ -38,7 +40,7 @@ impl NormalTempFile {
 
         open_standard(&from, direct_io).write_all(&buf).unwrap();
 
-        NormalTempFile {
+        Self {
             to: dir.path().join("to"),
             dir,
             from,
