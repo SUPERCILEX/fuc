@@ -11,8 +11,8 @@ use std::{
 
 use cache_size::l1_cache_size;
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, Throughput,
+    criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
+    BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use memmap2::{Mmap, MmapOptions};
 use rand::{thread_rng, RngCore};
@@ -49,6 +49,7 @@ impl NormalTempFile {
 /// Doesn't use direct I/O, so files will be mem cached
 fn with_memcache(c: &mut Criterion) {
     let mut group = c.benchmark_group("with_memcache");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
         add_benches(&mut group, num_bytes, false);
@@ -58,8 +59,9 @@ fn with_memcache(c: &mut Criterion) {
 /// Use direct I/O to create the file to be copied so it's not cached initially
 fn initially_uncached(c: &mut Criterion) {
     let mut group = c.benchmark_group("initially_uncached");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
-    for num_bytes in [1 << 20] {
+    for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
         add_benches(&mut group, num_bytes, true);
     }
 }
@@ -69,11 +71,10 @@ fn empty_files(c: &mut Criterion) {
 
     group.throughput(Throughput::Elements(1));
 
-    group.bench_function("copy_file_range", |b| {
+    group.bench_function("fs::copy", |b| {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
-                // Uses the copy_file_range syscall on Linux
                 copy(files.from, files.to).unwrap();
                 files.dir
             },
@@ -110,8 +111,9 @@ fn empty_files(c: &mut Criterion) {
 
 fn just_writes(c: &mut Criterion) {
     let mut group = c.benchmark_group("just_writes");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
-    for num_bytes in [1 << 20] {
+    for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
         group.throughput(Throughput::Bytes(num_bytes));
 
         group.bench_with_input(
@@ -168,14 +170,52 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.throughput(Throughput::Bytes(num_bytes));
 
     group.bench_with_input(
-        BenchmarkId::new("copy_file_range", num_bytes),
+        BenchmarkId::new("fs::copy", num_bytes),
         &num_bytes,
         |b, num_bytes| {
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes as usize, direct_io),
                 |files| {
-                    // Uses the copy_file_range syscall on Linux
                     copy(files.from, files.to).unwrap();
+                    files.dir
+                },
+                BatchSize::PerIteration,
+            )
+        },
+    );
+
+    #[cfg(target_os = "linux")]
+    group.bench_with_input(
+        BenchmarkId::new("copy_file_range", num_bytes),
+        &num_bytes,
+        |b, num_bytes| {
+            use nix::fcntl::copy_file_range;
+
+            b.iter_batched(
+                || NormalTempFile::create(*num_bytes as usize, direct_io),
+                |files| {
+                    let from = File::open(files.from).unwrap();
+                    let to = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .open(files.to)
+                        .unwrap();
+                    to.set_len(*num_bytes).unwrap();
+                    advise(&from);
+
+                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
+                    while bytes_remaining > 0 {
+                        bytes_remaining -= copy_file_range(
+                            from.as_raw_fd(),
+                            None,
+                            to.as_raw_fd(),
+                            None,
+                            bytes_remaining,
+                        )
+                        .unwrap();
+                    }
+
                     files.dir
                 },
                 BatchSize::PerIteration,
@@ -391,6 +431,40 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                     let mut writer = unsafe { MmapOptions::new().map_mut(&to) }.unwrap();
 
                     writer.copy_from_slice(reader.as_ref());
+
+                    files.dir
+                },
+                BatchSize::PerIteration,
+            )
+        },
+    );
+
+    #[cfg(target_os = "linux")]
+    group.bench_with_input(
+        BenchmarkId::new("sendfile", num_bytes),
+        &num_bytes,
+        |b, num_bytes| {
+            use nix::sys::sendfile::sendfile64;
+
+            b.iter_batched(
+                || NormalTempFile::create(*num_bytes as usize, direct_io),
+                |files| {
+                    let from = File::open(files.from).unwrap();
+                    let to = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .open(files.to)
+                        .unwrap();
+                    to.set_len(*num_bytes).unwrap();
+                    advise(&from);
+
+                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
+                    while bytes_remaining > 0 {
+                        bytes_remaining -=
+                            sendfile64(to.as_raw_fd(), from.as_raw_fd(), None, bytes_remaining)
+                                .unwrap();
+                    }
 
                     files.dir
                 },
