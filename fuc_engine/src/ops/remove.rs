@@ -73,7 +73,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
         }
     }
 
-    for dir in dirs.into_iter().rev() {
+    for dir in dirs.into_iter().rev().flatten() {
         fs::remove_dir(&dir).map_err(|error| Error::Io {
             error,
             context: format!("Failed to delete directory: {dir:?}"),
@@ -85,8 +85,10 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
 
 fn delete_dir(
     dir: PathBuf,
-    tasks: UnboundedSender<JoinHandle<Result<PathBuf, Error>>>,
-) -> Result<PathBuf, Error> {
+    tasks: UnboundedSender<JoinHandle<Result<Option<PathBuf>, Error>>>,
+) -> Result<Option<PathBuf>, Error> {
+    let mut has_children = false;
+
     // TODO use getdents64 on linux
     let files = fs::read_dir(&dir).map_err(|error| Error::Io {
         error,
@@ -105,6 +107,7 @@ fn delete_dir(
             })?
             .is_dir();
 
+        has_children |= is_dir;
         if is_dir {
             tasks
                 .send(task::spawn_blocking({
@@ -121,5 +124,13 @@ fn delete_dir(
         }
     }
 
-    Ok(dir)
+    if has_children {
+        Ok(Some(dir))
+    } else {
+        fs::remove_dir(&dir).map_err(|error| Error::Io {
+            error,
+            context: format!("Failed to delete directory: {dir:?}"),
+        })?;
+        Ok(None)
+    }
 }
