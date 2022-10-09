@@ -1,10 +1,15 @@
 [package]
 name = "fuc_engine"
-version = "0.1.0"
-authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 description = "Engine for the FUCing project."
-repository = "https://github.com/SUPERCILEX/fuc"
+repository.workspace = true
 keywords = ["tools", "files"]
 categories = ["filesystem"]
-license = "Apache-2.0"
+license.workspace = true
+
+[dependencies]
+thiserror = "1.0.37"
+tokio = { version = "1.21.2", features = ["rt", "sync"] }
+typed-builder = "0.10.0"

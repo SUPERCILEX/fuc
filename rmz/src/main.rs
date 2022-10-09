@@ -1,62 +1,60 @@
-use std::{path::PathBuf, process::exit};
+use std::path::PathBuf;
 
-use clap::{AppSettings, Parser};
+use clap::{ArgAction, Parser, ValueHint};
+use clap_verbosity_flag::Verbosity;
 
-use fuc_core::errors::CliResult;
+use fuc_engine::{FsOp, RemoveOp};
 
 /// A zippy alternative to rm
 #[derive(Parser, Debug)]
 #[clap(version, author = "Alex Saveau (@SUPERCILEX)")]
-#[clap(global_setting(AppSettings::InferSubcommands))]
-#[clap(global_setting(AppSettings::UseLongFormatForHelpSubcommand))]
-#[cfg_attr(test, clap(global_setting(AppSettings::HelpExpected)))]
-#[clap(setting(AppSettings::ArgRequiredElseHelp))]
+#[clap(infer_subcommands = true, infer_long_args = true)]
+#[clap(next_display_order = None)]
+#[clap(max_term_width = 100)]
+#[command(disable_help_flag = true)]
+#[cfg_attr(test, clap(help_expected = true))]
 struct Rmz {
-    // #[clap(flatten)]
-    // verbose: Verbosity,
     /// The files to be removed
     #[clap(required = true)]
+    #[clap(value_hint = ValueHint::DirPath)]
     files: Vec<PathBuf>,
+    #[clap(flatten)]
+    verbose: Verbosity,
+    #[arg(short, long, short_alias = '?', global = true)]
+    #[arg(action = ArgAction::Help, help = "Print help information (use `--help` for more detail)")]
+    #[arg(long_help = "Print help information (use `-h` for a summary)")]
+    help: Option<bool>,
 }
 
 fn main() {
-    if let Err(e) = wrapped_main() {
-        if let Some(source) = e.source {
-            eprintln!("{:?}", source);
-        }
-        exit(e.code);
-    }
-}
-
-fn wrapped_main() -> CliResult<()> {
     let args = Rmz::parse();
-    // SimpleLogger::new()
-    //     .with_level(args.verbose.log_level().unwrap().to_level_filter())
-    //     .init()
-    //     .unwrap();
 
-    todo!()
+    RemoveOp::builder()
+        .files(args.files.iter().map(AsRef::as_ref))
+        .build()
+        .run()
+        .unwrap();
 }
 
-#[cfg(test)]
-mod tests {
-    use clap::{ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand, IntoApp};
-
-    use super::*;
-
-    #[test]
-    fn verify_app() {
-        Rmz::into_app().debug_assert()
-    }
-
-    #[test]
-    fn empty_args_displays_help() {
-        let f = Rmz::try_parse_from(Vec::<String>::new());
-
-        assert!(f.is_err());
-        assert_eq!(
-            f.unwrap_err().kind,
-            DisplayHelpOnMissingArgumentOrSubcommand
-        )
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use clap::{ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand, IntoApp};
+//
+//     use super::*;
+//
+//     #[test]
+//     fn verify_app() {
+//         Rmz::into_app().debug_assert()
+//     }
+//
+//     #[test]
+//     fn empty_args_displays_help() {
+//         let f = Rmz::try_parse_from(Vec::<String>::new());
+//
+//         assert!(f.is_err());
+//         assert_eq!(
+//             f.unwrap_err().kind,
+//             DisplayHelpOnMissingArgumentOrSubcommand
+//         )
+//     }
+// }

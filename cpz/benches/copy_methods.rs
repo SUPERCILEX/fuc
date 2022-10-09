@@ -18,7 +18,8 @@ use memmap2::{Mmap, MmapOptions};
 use rand::{thread_rng, RngCore};
 use tempfile::{tempdir, TempDir};
 
-// Don't use an OS backed tempfile since it might change the performance characteristics of our copy
+// Don't use an OS backed tempfile since it might change the performance
+// characteristics of our copy
 struct NormalTempFile {
     dir: TempDir,
     from: PathBuf,
@@ -288,7 +289,8 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes as usize, direct_io),
                 |files| {
-                    let threads = num_cpus::get() as u64;
+                    let threads =
+                        u64::try_from(thread::available_parallelism().unwrap().get()).unwrap();
                     let chunk_size = num_bytes / threads;
 
                     let from = File::open(files.from).unwrap();
@@ -296,7 +298,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                     advise(&from);
                     to.set_len(*num_bytes).unwrap();
 
-                    let mut results = Vec::with_capacity(threads as usize);
+                    let mut results = Vec::with_capacity(usize::try_from(threads).unwrap());
                     for i in 0..threads {
                         let from = from.try_clone().unwrap();
                         let to = to.try_clone().unwrap();
@@ -498,6 +500,7 @@ fn open_standard(path: &Path, direct_io: bool) -> File {
         Errno::result(unsafe { fcntl(file.as_raw_fd(), F_NOCACHE) }).unwrap();
     }
 
+    #[allow(clippy::let_and_return)]
     file
 }
 
@@ -531,7 +534,8 @@ fn allocate(file: &File, len: u64) {
 }
 
 fn advise(_file: &File) {
-    // Interestingly enough, this either had no effect on performance or made it slightly worse.
+    // Interestingly enough, this either had no effect on performance or made it
+    // slightly worse.
     // posix_fadvise(file.as_raw_fd(), 0, 0, POSIX_FADV_SEQUENTIAL).unwrap();
 }
 

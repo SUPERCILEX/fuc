@@ -1,16 +1,15 @@
 [package]
 name = "rmz"
-version = "0.1.0"
-authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
 description = "Fast rm provides an alternative to rm that focuses on maximizing performance."
-repository = "https://github.com/SUPERCILEX/fuc"
+repository.workspace = true
 keywords = ["tools", "files", "rm"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
-license = "Apache-2.0"
+license.workspace = true
 
 [dependencies]
-anyhow = "1.0.51"
-clap = { version = "3.0.0-rc.4", features = ["derive", "wrap_help"] }
-exitcode = "1.1.2"
-fuc_core = { path = "../fuc_core" }
+clap = { version = "4.0.10", features = ["derive", "wrap_help"] }
+clap-verbosity-flag = "2.0.0"
+fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
