@@ -55,10 +55,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
                         move || delete_dir(dir, tx)
                     }));
                 } else {
-                    fs::remove_file(file).map_err(|error| Error::Io {
-                        error,
-                        context: format!("Failed to delete file: {file:?}"),
-                    })?;
+                    remove_file(file)?;
                 }
             }
             drop(tx);
@@ -74,10 +71,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
     }
 
     for dir in dirs.into_iter().rev().flatten() {
-        fs::remove_dir(&dir).map_err(|error| Error::Io {
-            error,
-            context: format!("Failed to delete directory: {dir:?}"),
-        })?;
+        remove_dir(dir)?;
     }
 
     Ok(())
@@ -117,20 +111,30 @@ fn delete_dir(
                 }))
                 .map_err(|_| Error::Internal)?;
         } else {
-            fs::remove_file(file.path()).map_err(|error| Error::Io {
-                error,
-                context: format!("Failed to delete file: {file:?}"),
-            })?;
+            remove_file(file.path())?;
         }
     }
 
     if has_children {
         Ok(Some(dir))
     } else {
-        fs::remove_dir(&dir).map_err(|error| Error::Io {
-            error,
-            context: format!("Failed to delete directory: {dir:?}"),
-        })?;
+        remove_dir(dir)?;
         Ok(None)
     }
+}
+
+fn remove_file(file: impl AsRef<Path>) -> Result<(), Error> {
+    let file = file.as_ref();
+    fs::remove_file(file).map_err(|error| Error::Io {
+        error,
+        context: format!("Failed to delete file: {file:?}"),
+    })
+}
+
+fn remove_dir(dir: impl AsRef<Path>) -> Result<(), Error> {
+    let dir = dir.as_ref();
+    fs::remove_dir(dir).map_err(|error| Error::Io {
+        error,
+        context: format!("Failed to delete directory: {dir:?}"),
+    })
 }
