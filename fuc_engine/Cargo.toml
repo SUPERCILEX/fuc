@@ -13,3 +13,8 @@ license.workspace = true
 thiserror = "1.0.37"
 tokio = { version = "1.21.2", features = ["rt", "sync"] }
 typed-builder = "0.10.0"
+
+[dev-dependencies]
+goldenfile = "1.4.3"
+public-api = "0.20.0"
+rustdoc-json = "0.4.1"

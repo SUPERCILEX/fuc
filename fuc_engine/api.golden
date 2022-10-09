@@ -1,0 +1,25 @@
+impl !RefUnwindSafe for fuc_engine::Error
+impl !UnwindSafe for fuc_engine::Error
+impl Send for fuc_engine::Error
+impl Sync for fuc_engine::Error
+impl Unpin for fuc_engine::Error
+impl<'a, F> RefUnwindSafe for fuc_engine::RemoveOp<'a, F> where F: RefUnwindSafe
+impl<'a, F> Send for fuc_engine::RemoveOp<'a, F> where F: Send
+impl<'a, F> Sync for fuc_engine::RemoveOp<'a, F> where F: Sync
+impl<'a, F> Unpin for fuc_engine::RemoveOp<'a, F> where F: Unpin
+impl<'a, F> UnwindSafe for fuc_engine::RemoveOp<'a, F> where F: UnwindSafe
+pub enum fuc_engine::Error
+pub enum variant fuc_engine::Error::Internal
+pub enum variant fuc_engine::Error::Io
+pub enum variant fuc_engine::Error::RuntimeCreation(io::Error)
+pub enum variant fuc_engine::Error::TaskJoin(JoinError)
+pub fn fuc_engine::Error::fmt(&self, __formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+pub fn fuc_engine::Error::fmt(&self, f: &mut $crate::fmt::Formatter<'_>) -> $crate::fmt::Result
+pub fn fuc_engine::RemoveOp::builder() -> RemoveOpBuilder<'a, (()), F>
+pub fn fuc_engine::RemoveOp::fmt(&self, f: &mut $crate::fmt::Formatter<'_>) -> $crate::fmt::Result
+pub fn fuc_engine::RemoveOp::run(self) -> Result<(), fuc_engine::Error>
+pub fn fuc_engine::remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), fuc_engine::Error>
+pub mod fuc_engine
+pub struct field fuc_engine::Error::Io::context: String
+pub struct field fuc_engine::Error::Io::error: io::Error
+pub struct fuc_engine::RemoveOp<'a, F: IntoIterator<Item = &'a Path>>

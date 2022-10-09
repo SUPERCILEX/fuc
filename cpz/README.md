@@ -6,7 +6,7 @@ A zippy alternative to `cp`, a tool to remove files or directories.
 
 ⚠ UNDER CONSTRUCTION ⚠
 
-## Basic usage
+## Usage
 
 Background: https://github.com/SUPERCILEX/fuc/blob/master/README.md
 
