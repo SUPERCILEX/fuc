@@ -44,6 +44,7 @@ fn main() -> Result<(), CliError> {
 
     RemoveOp::builder()
         .files(args.files.iter().map(AsRef::as_ref))
+        .force(args.force)
         .build()
         .run()
         .map_err(|e| {

@@ -1,5 +1,5 @@
 use std::{
-    fs,
+    fs, io,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     thread,
@@ -15,6 +15,8 @@ use crate::Error;
 pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
     // TODO make this a variant that's either owned or not. Maybe Cow?
     files: F,
+    #[builder(default = false)]
+    force: bool,
 }
 
 impl<'a, F: IntoIterator<Item = &'a Path>> RemoveOp<'a, F> {
@@ -45,13 +47,14 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
         {
             let mut tasks = Vec::new();
             for file in op.files {
-                let is_dir = file
-                    .metadata()
-                    .map_err(|error| Error::Io {
-                        error,
-                        context: format!("Failed to read metadata for file: {file:?}"),
-                    })?
-                    .is_dir();
+                let is_dir = match file.metadata() {
+                    Err(e) if op.force && e.kind() == io::ErrorKind::NotFound => {
+                        continue;
+                    }
+                    r => r,
+                }
+                .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
+                .is_dir();
 
                 if is_dir {
                     tasks.push(task::spawn_blocking({
@@ -60,7 +63,8 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
                         move || delete_dir(dir, &tx)
                     }));
                 } else {
-                    remove_file(file)?;
+                    fs::remove_file(file)
+                        .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
                 }
             }
             drop(tx);
@@ -76,7 +80,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
     }
 
     for dir in dirs.into_iter().rev().flatten() {
-        remove_dir(dir)?;
+        fs::remove_dir(&dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
     }
 
     Ok(())
@@ -89,21 +93,12 @@ fn delete_dir(
     let mut has_children = false;
 
     // TODO use getdents64 on linux
-    let files = fs::read_dir(&dir).map_err(|error| Error::Io {
-        error,
-        context: format!("Failed to read dir: {dir:?}"),
-    })?;
+    let files = fs::read_dir(&dir).map_io_err(|| format!("Failed to read directory: {dir:?}"))?;
     for file in files {
-        let file = file.map_err(|error| Error::Io {
-            error,
-            context: format!("DirEntry fetch failed for dir: {dir:?}"),
-        })?;
+        let file = file.map_io_err(|| format!("DirEntry fetch failed for directory: {dir:?}"))?;
         let is_dir = file
             .file_type()
-            .map_err(|error| Error::Io {
-                error,
-                context: format!("Failed to read metadata for file: {file:?}"),
-            })?
+            .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
             .is_dir();
 
         has_children |= is_dir;
@@ -116,30 +111,28 @@ fn delete_dir(
                 }))
                 .map_err(|_| Error::Internal)?;
         } else {
-            remove_file(file.path())?;
+            let file = file.path();
+            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
         }
     }
 
     if has_children {
         Ok(Some(dir))
     } else {
-        remove_dir(dir)?;
+        fs::remove_dir(&dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
         Ok(None)
     }
 }
 
-fn remove_file(file: impl AsRef<Path>) -> Result<(), Error> {
-    let file = file.as_ref();
-    fs::remove_file(file).map_err(|error| Error::Io {
-        error,
-        context: format!("Failed to delete file: {file:?}"),
-    })
+trait IoErr<Out> {
+    fn map_io_err(self, f: impl FnOnce() -> String) -> Out;
 }
 
-fn remove_dir(dir: impl AsRef<Path>) -> Result<(), Error> {
-    let dir = dir.as_ref();
-    fs::remove_dir(dir).map_err(|error| Error::Io {
-        error,
-        context: format!("Failed to delete directory: {dir:?}"),
-    })
+impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
+    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
+        self.map_err(|error| Error::Io {
+            error,
+            context: context(),
+        })
+    }
 }

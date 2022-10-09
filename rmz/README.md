@@ -35,9 +35,6 @@ Ignore non-existent files:
 
 ```console
 $ rmz -f non-existent
-thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value: Io { error: Os { code: 2, kind: NotFound, message: "No such file or directory" }, context: "Failed to read metadata for file: /"non-existent/"" }', rmz/src/main.rs:42:10
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-
 ```
 
 Other options:
