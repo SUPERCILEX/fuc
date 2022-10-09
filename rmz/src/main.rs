@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, ValueHint};
 use clap_verbosity_flag::Verbosity;
+use error_stack::{Report, Result};
 
-use fuc_engine::RemoveOp;
+use fuc_engine::{Error, RemoveOp};
 
 /// A zippy alternative to `rm`, a tool to remove files or directories
 #[derive(Parser, Debug)]
@@ -32,14 +33,30 @@ struct Rmz {
     help: Option<bool>,
 }
 
-fn main() {
+#[derive(thiserror::Error, Debug)]
+pub enum CliError {
+    #[error("{0}")]
+    Wrapper(String),
+}
+
+fn main() -> Result<(), CliError> {
     let args = Rmz::parse();
 
     RemoveOp::builder()
         .files(args.files.iter().map(AsRef::as_ref))
         .build()
         .run()
-        .unwrap();
+        .map_err(|e| {
+            let wrapper = CliError::Wrapper(format!("{e}"));
+            match e {
+                Error::RuntimeCreation(e) => Report::from(e).change_context(wrapper),
+                Error::Io { error, context } => Report::from(error)
+                    .attach_printable(context)
+                    .change_context(wrapper),
+                Error::TaskJoin(e) => Report::from(e).change_context(wrapper),
+                Error::Internal => Report::from(wrapper),
+            }
+        })
 }
 
 #[cfg(test)]

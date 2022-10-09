@@ -1,19 +1,6 @@
-use std::{
-    alloc,
-    alloc::Layout,
-    fs::{copy, File, OpenOptions},
-    io::{BufRead, BufReader, Read, Write},
-    os::unix::{fs::FileExt, io::AsRawFd},
-    path::{Path, PathBuf},
-    thread,
-    time::Duration,
-};
+use std::time::Duration;
 
-use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
-    BenchmarkId, Criterion, PlotConfiguration, Throughput,
-};
-use tempfile::{tempdir, TempDir};
+use criterion::{criterion_group, criterion_main, AxisScale, Criterion, PlotConfiguration};
 
 fn uniform(c: &mut Criterion) {
     let mut group = c.benchmark_group("uniform");

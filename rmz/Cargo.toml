@@ -12,7 +12,9 @@ license.workspace = true
 [dependencies]
 clap = { version = "4.0.10", features = ["derive", "wrap_help"] }
 clap-verbosity-flag = "2.0.0"
+error-stack = "0.2.2"
 fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
+thiserror = "1.0.37"
 
 [dev-dependencies]
 criterion = "0.4.0"
