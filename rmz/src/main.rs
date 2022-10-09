@@ -5,19 +5,25 @@ use clap_verbosity_flag::Verbosity;
 
 use fuc_engine::{FsOp, RemoveOp};
 
-/// A zippy alternative to rm
+/// A zippy alternative to rm, a tool to remove files or directories
 #[derive(Parser, Debug)]
 #[clap(version, author = "Alex Saveau (@SUPERCILEX)")]
 #[clap(infer_subcommands = true, infer_long_args = true)]
-#[clap(next_display_order = None)]
 #[clap(max_term_width = 100)]
 #[command(disable_help_flag = true)]
 #[cfg_attr(test, clap(help_expected = true))]
 struct Rmz {
-    /// The files to be removed
+    /// The files and/or directories to be removed
     #[clap(required = true)]
-    #[clap(value_hint = ValueHint::DirPath)]
+    #[clap(value_hint = ValueHint::AnyPath)]
     files: Vec<PathBuf>,
+    /// Ignore non-existent arguments
+    #[arg(short, long, default_value_t = false)]
+    force: bool,
+    /// Allow deletion of '/'
+    #[arg(long = "no-preserve-root", default_value_t = true)]
+    #[arg(action = ArgAction::SetFalse)]
+    preserve_root: bool,
     #[clap(flatten)]
     verbose: Verbosity,
     #[arg(short, long, short_alias = '?', global = true)]
@@ -36,25 +42,54 @@ fn main() {
         .unwrap();
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use clap::{ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand, IntoApp};
-//
-//     use super::*;
-//
-//     #[test]
-//     fn verify_app() {
-//         Rmz::into_app().debug_assert()
-//     }
-//
-//     #[test]
-//     fn empty_args_displays_help() {
-//         let f = Rmz::try_parse_from(Vec::<String>::new());
-//
-//         assert!(f.is_err());
-//         assert_eq!(
-//             f.unwrap_err().kind,
-//             DisplayHelpOnMissingArgumentOrSubcommand
-//         )
-//     }
-// }
+#[cfg(test)]
+mod cli_tests {
+    use std::io::Write;
+
+    use clap::{Command, CommandFactory};
+    use goldenfile::Mint;
+
+    use super::*;
+
+    #[test]
+    fn verify_app() {
+        Rmz::command().debug_assert();
+    }
+
+    #[test]
+    fn help_for_review() {
+        let mut command = Rmz::command();
+
+        command.build();
+
+        let mut mint = Mint::new(".");
+        let mut long = mint.new_goldenfile("command-reference.golden").unwrap();
+        let mut short = mint
+            .new_goldenfile("command-reference-short.golden")
+            .unwrap();
+
+        write_help(&mut long, &mut command, LongOrShortHelp::Long);
+        write_help(&mut short, &mut command, LongOrShortHelp::Short);
+    }
+
+    #[derive(Copy, Clone)]
+    enum LongOrShortHelp {
+        Long,
+        Short,
+    }
+
+    fn write_help(buffer: &mut impl Write, cmd: &mut Command, long_or_short_help: LongOrShortHelp) {
+        match long_or_short_help {
+            LongOrShortHelp::Long => cmd.write_long_help(buffer).unwrap(),
+            LongOrShortHelp::Short => cmd.write_help(buffer).unwrap(),
+        }
+
+        for sub in cmd.get_subcommands_mut() {
+            writeln!(buffer).unwrap();
+            writeln!(buffer, "---").unwrap();
+            writeln!(buffer).unwrap();
+
+            write_help(buffer, sub, long_or_short_help);
+        }
+    }
+}

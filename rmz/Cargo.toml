@@ -13,3 +13,6 @@ license.workspace = true
 clap = { version = "4.0.10", features = ["derive", "wrap_help"] }
 clap-verbosity-flag = "2.0.0"
 fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
+
+[dev-dependencies]
+goldenfile = "1.4.3"
