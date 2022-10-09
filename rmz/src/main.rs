@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::{ArgAction, Parser, ValueHint};
 use clap_verbosity_flag::Verbosity;
 
-use fuc_engine::{FsOp, RemoveOp};
+use fuc_engine::RemoveOp;
 
 /// A zippy alternative to `rm`, a tool to remove files or directories
 #[derive(Parser, Debug)]

@@ -1,9 +1,11 @@
+#![allow(clippy::module_name_repetitions)]
+
 use std::{io, path::Path};
 
 use thiserror::Error;
 use tokio::task::JoinError;
 
-pub use crate::ops::{FsOp, RemoveOp};
+pub use crate::ops::RemoveOp;
 
 mod ops;
 
@@ -19,6 +21,16 @@ pub enum Error {
     Internal,
 }
 
+/// Removes a directory at this path, after removing all its contents.
+///
+/// This function does **not** follow symbolic links and it will simply remove
+/// the symbolic link itself.
+///
+/// > Note: This function currently starts its own tokio runtime.
+///
+/// # Errors
+///
+/// Returns the underlying I/O errors that occurred.
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), Error> {
     RemoveOp::builder().files([path.as_ref()]).build().run()
 }

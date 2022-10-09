@@ -9,7 +9,7 @@ use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
 
-use crate::{Error, FsOp};
+use crate::Error;
 
 #[derive(TypedBuilder, Debug)]
 pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
@@ -17,8 +17,13 @@ pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
     files: F,
 }
 
-impl<'a, F: IntoIterator<Item = &'a Path>> FsOp for RemoveOp<'a, F> {
-    fn run(self) -> Result<(), Error> {
+impl<'a, F: IntoIterator<Item = &'a Path>> RemoveOp<'a, F> {
+    /// Consume and run this remove operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying I/O errors that occurred.
+    pub fn run(self) -> Result<(), Error> {
         let parallelism =
             thread::available_parallelism().unwrap_or(unsafe { NonZeroUsize::new_unchecked(1) });
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -52,7 +57,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
                     tasks.push(task::spawn_blocking({
                         let dir = file.to_path_buf();
                         let tx = tx.clone();
-                        move || delete_dir(dir, tx)
+                        move || delete_dir(dir, &tx)
                     }));
                 } else {
                     remove_file(file)?;
@@ -79,7 +84,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
 
 fn delete_dir(
     dir: PathBuf,
-    tasks: UnboundedSender<JoinHandle<Result<Option<PathBuf>, Error>>>,
+    tasks: &UnboundedSender<JoinHandle<Result<Option<PathBuf>, Error>>>,
 ) -> Result<Option<PathBuf>, Error> {
     let mut has_children = false;
 
@@ -107,7 +112,7 @@ fn delete_dir(
                 .send(task::spawn_blocking({
                     let dir = file.path();
                     let tasks = tasks.clone();
-                    move || delete_dir(dir, tasks)
+                    move || delete_dir(dir, &tasks)
                 }))
                 .map_err(|_| Error::Internal)?;
         } else {
