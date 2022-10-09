@@ -17,6 +17,8 @@ pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
     files: F,
     #[builder(default = false)]
     force: bool,
+    #[builder(default = true)]
+    preserve_root: bool,
 }
 
 impl<'a, F: IntoIterator<Item = &'a Path>> RemoveOp<'a, F> {
@@ -47,6 +49,9 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
         {
             let mut tasks = Vec::new();
             for file in op.files {
+                if op.preserve_root && file == Path::new("/") {
+                    return Err(Error::PreserveRoot);
+                }
                 let is_dir = match file.metadata() {
                     Err(e) if op.force && e.kind() == io::ErrorKind::NotFound => {
                         continue;

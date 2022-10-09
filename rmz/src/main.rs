@@ -45,6 +45,7 @@ fn main() -> Result<(), CliError> {
     RemoveOp::builder()
         .files(args.files.iter().map(AsRef::as_ref))
         .force(args.force)
+        .preserve_root(args.preserve_root)
         .build()
         .run()
         .map_err(|e| {
@@ -55,7 +56,7 @@ fn main() -> Result<(), CliError> {
                     .attach_printable(context)
                     .change_context(wrapper),
                 Error::TaskJoin(e) => Report::from(e).change_context(wrapper),
-                Error::Internal => Report::from(wrapper),
+                Error::PreserveRoot | Error::Internal => Report::from(wrapper),
             }
         })
 }

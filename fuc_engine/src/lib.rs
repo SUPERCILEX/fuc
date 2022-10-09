@@ -15,6 +15,8 @@ pub enum Error {
     RuntimeCreation(io::Error),
     #[error("An IO error occurred.")]
     Io { error: io::Error, context: String },
+    #[error("An attempt was made to delete `/`.")]
+    PreserveRoot,
     #[error("Failed to retrieve subtask results.")]
     TaskJoin(JoinError),
     #[error("An internal bug occurred, please report this.")]
