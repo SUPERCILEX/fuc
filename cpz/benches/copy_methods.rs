@@ -28,12 +28,6 @@ struct NormalTempFile {
 
 impl NormalTempFile {
     fn create(bytes: u64, direct_io: bool) -> Self {
-        assert!(
-            !direct_io || bytes % (1 << 12) == 0,
-            "Num bytes ({}) must be divisible by 2^12",
-            bytes
-        );
-
         let dir = tempdir().unwrap();
         let from = dir.path().join("from");
 
@@ -54,7 +48,7 @@ fn with_memcache(c: &mut Criterion) {
     let mut group = c.benchmark_group("with_memcache");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
-    for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
+    for num_bytes in [1 << 12, 1 << 20, 1 << 25] {
         add_benches(&mut group, num_bytes, false);
     }
 }
@@ -64,7 +58,7 @@ fn initially_uncached(c: &mut Criterion) {
     let mut group = c.benchmark_group("initially_uncached");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
-    for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
+    for num_bytes in [1 << 12, 1 << 20, 1 << 25] {
         add_benches(&mut group, num_bytes, true);
     }
 }
@@ -182,7 +176,7 @@ fn just_writes(c: &mut Criterion) {
     let mut group = c.benchmark_group("just_writes");
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
-    for num_bytes in [1 << 10, 1 << 20, 1 << 25] {
+    for num_bytes in [1 << 12, 1 << 20, 1 << 25] {
         group.throughput(Throughput::Bytes(num_bytes));
 
         group.bench_with_input(
@@ -598,6 +592,12 @@ fn allocate(file: &File, len: u64) {
 }
 
 fn create_random_buffer(bytes: usize, direct_io: bool) -> Vec<u8> {
+    assert!(
+        !direct_io || bytes % (1 << 12) == 0,
+        "Num bytes ({}) must be divisible by 2^12",
+        bytes
+    );
+
     let mut buf = if direct_io {
         let layout = Layout::from_size_align(bytes, 1 << 12).unwrap();
         let ptr = unsafe { alloc::alloc(layout) };
