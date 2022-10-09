@@ -15,6 +15,8 @@ tokio = { version = "1.21.2", features = ["rt", "sync"] }
 typed-builder = "0.10.0"
 
 [dev-dependencies]
+ftzz = "1.1.3"
 goldenfile = "1.4.3"
 public-api = "0.20.0"
 rustdoc-json = "0.4.1"
+tempfile = "3.3.0"

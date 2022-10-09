@@ -5,6 +5,7 @@ use public_api::PublicApi;
 use rustdoc_json::BuildOptions;
 
 #[test]
+#[ignore] // TODO https://github.com/Enselic/cargo-public-api/issues/175
 fn api() {
     let json_path =
         rustdoc_json::Builder::build(BuildOptions::default().all_features(true)).unwrap();
