@@ -85,7 +85,7 @@ fn empty_files(c: &mut Criterion) {
         );
     });
 
-    group.bench_function("open", |b| {
+    group.bench_function("File::create", |b| {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
@@ -109,6 +109,72 @@ fn empty_files(c: &mut Criterion) {
             },
             BatchSize::LargeInput,
         );
+    });
+
+    #[cfg(target_os = "linux")]
+    group.bench_function("mknodat", |b| {
+        b.iter_batched(
+            || {
+                let files = NormalTempFile::create(0, false);
+                let dir = File::open(files.dir.path()).unwrap();
+                (files, dir)
+            },
+            |(files, dir)| {
+                use nix::sys::stat::{mknodat, Mode, SFlag};
+                mknodat(
+                    dir.as_raw_fd(),
+                    files.to.as_path(),
+                    SFlag::S_IFREG,
+                    Mode::empty(),
+                    0,
+                )
+                .unwrap();
+
+                files.dir
+            },
+            BatchSize::LargeInput,
+        );
+    });
+
+    #[cfg(target_os = "linux")]
+    group.bench_function("open", |b| {
+        let files = NormalTempFile::create(0, false);
+        b.iter(|| {
+            use nix::{
+                fcntl::{open, OFlag},
+                sys::stat::Mode,
+            };
+            use std::os::fd::FromRawFd;
+
+            let fd = open(files.to.as_path(), OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
+            unsafe {
+                File::from_raw_fd(fd);
+            }
+        });
+    });
+
+    #[cfg(target_os = "linux")]
+    group.bench_function("openat", |b| {
+        let files = NormalTempFile::create(0, false);
+        let dir = File::open(files.dir.path()).unwrap();
+        b.iter(|| {
+            use nix::{
+                fcntl::{openat, OFlag},
+                sys::stat::Mode,
+            };
+            use std::os::fd::FromRawFd;
+
+            let fd = openat(
+                dir.as_raw_fd(),
+                files.to.as_path(),
+                OFlag::O_CREAT,
+                Mode::S_IRWXU,
+            )
+            .unwrap();
+            unsafe {
+                File::from_raw_fd(fd);
+            }
+        });
     });
 }
 
