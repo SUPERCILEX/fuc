@@ -1,4 +1,4 @@
-A zippy alternative to rm, a tool to remove files or directories
+A zippy alternative to `rm`, a tool to remove files or directories
 
 Usage: rmz [OPTIONS] <FILES>...
 
@@ -7,7 +7,7 @@ Arguments:
 
 Options:
   -f, --force             Ignore non-existent arguments
-      --no-preserve-root  Allow deletion of '/'
+      --no-preserve-root  Allow deletion of `/`
   -v, --verbose...        More output per occurrence
   -q, --quiet...          Less output per occurrence
   -h, --help              Print help information (use `--help` for more detail)

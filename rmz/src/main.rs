@@ -5,7 +5,7 @@ use clap_verbosity_flag::Verbosity;
 
 use fuc_engine::{FsOp, RemoveOp};
 
-/// A zippy alternative to rm, a tool to remove files or directories
+/// A zippy alternative to `rm`, a tool to remove files or directories
 #[derive(Parser, Debug)]
 #[clap(version, author = "Alex Saveau (@SUPERCILEX)")]
 #[clap(infer_subcommands = true, infer_long_args = true)]
@@ -20,7 +20,7 @@ struct Rmz {
     /// Ignore non-existent arguments
     #[arg(short, long, default_value_t = false)]
     force: bool,
-    /// Allow deletion of '/'
+    /// Allow deletion of `/`
     #[arg(long = "no-preserve-root", default_value_t = true)]
     #[arg(action = ArgAction::SetFalse)]
     preserve_root: bool,
