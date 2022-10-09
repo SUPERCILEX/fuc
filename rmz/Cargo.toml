@@ -15,4 +15,10 @@ clap-verbosity-flag = "2.0.0"
 fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
 
 [dev-dependencies]
+criterion = "0.4.0"
 goldenfile = "1.4.3"
+tempfile = "3.3.0"
+
+[[bench]]
+name = "rmz"
+harness = false
