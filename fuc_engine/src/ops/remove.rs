@@ -48,6 +48,8 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
+        // TODO see if we should instead wait until we've seen a directory to boot up
+        //  the runtime
         let parallelism =
             thread::available_parallelism().unwrap_or(unsafe { NonZeroUsize::new_unchecked(1) });
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -59,6 +61,8 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     }
 }
 
+// TODO add tracing to each method
+// TODO add debug logging for each fs op
 async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
     op: RemoveOp<'a, F>,
 ) -> Result<(), Error> {
@@ -132,6 +136,8 @@ fn delete_dir(
                 tasks
                     .send(task::spawn_blocking({
                         let node = TreeNode {
+                            // TODO see if we can instead just pass in a file descriptor and use the
+                            //  *at syscalls to reduce memory allocations
                             path: file.path(),
                             parent: Some(node.arc()),
                             remaining_children: AtomicIsize::new(0),
@@ -199,6 +205,7 @@ mod tree {
     #[derive(Default)]
     pub struct TreeNode {
         pub path: PathBuf,
+        // TODO manually implement this Arc with our remaining_children atomic
         pub parent: Option<Arc<TreeNode>>,
         pub remaining_children: AtomicIsize,
     }
