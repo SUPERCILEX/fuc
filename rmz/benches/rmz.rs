@@ -188,6 +188,24 @@ fn add_benches(
             );
         },
     );
+
+    group.bench_with_input(
+        BenchmarkId::new("XAMPPRocky::remove_dir_all", num_files),
+        &num_files,
+        |b, num_files| {
+            b.iter_with_setup(
+                || {
+                    let dir = tempdir().unwrap();
+                    gen_files(dir.path(), *num_files);
+                    dir
+                },
+                |dir| {
+                    remove_dir_all::remove_dir_all(dir.path()).unwrap();
+                    dir
+                },
+            );
+        },
+    );
 }
 
 /// Implementation of the OG post that started all this:
