@@ -193,7 +193,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("XAMPPRocky::remove_dir_all", num_files),
+        BenchmarkId::new("rayon_fs::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -203,7 +203,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    remove_dir_all::remove_dir_all(dir.path()).unwrap();
+                    rayon_fs::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },
@@ -282,6 +282,29 @@ mod og_crappy {
 
     fn spawn_remove_dir_all_recursive(path: &Path) -> JoinHandle<io::Result<()>> {
         tokio::task::spawn(remove_dir_all_recursive(path.to_path_buf()))
+    }
+}
+
+/// Copied from <https://github.com/XAMPPRocky/remove_dir_all>
+mod rayon_fs {
+    use std::{fs, io, path::Path};
+
+    use rayon::prelude::*;
+
+    pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), io::Error> {
+        path.as_ref()
+            .read_dir()?
+            .par_bridge()
+            .try_for_each(|dir_entry| -> io::Result<()> {
+                let dir_entry = dir_entry?;
+                if dir_entry.file_type()?.is_dir() {
+                    remove_dir_all(dir_entry.path())?;
+                } else {
+                    fs::remove_file(dir_entry.path())?;
+                }
+                Ok(())
+            })?;
+        fs::remove_dir(path)
     }
 }
 
