@@ -88,8 +88,15 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
         }
     }
 
-    for dir in dirs.iter().rev() {
-        fs::remove_dir(dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
+    // TODO get rid of this garbage and use a tree with parallel deletions
+    while let Some(dir) = dirs.pop() {
+        match fs::remove_dir_all(&dir) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                continue;
+            }
+            r => r,
+        }
+        .map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
     }
 
     Ok(())

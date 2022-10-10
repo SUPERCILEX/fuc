@@ -49,6 +49,7 @@ fn with_memcache(c: &mut Criterion) {
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for num_bytes in [1 << 12, 1 << 20, 1 << 25] {
+        group.throughput(Throughput::Bytes(num_bytes));
         add_benches(&mut group, num_bytes, false);
     }
 }
@@ -59,6 +60,7 @@ fn initially_uncached(c: &mut Criterion) {
     group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for num_bytes in [1 << 12, 1 << 20, 1 << 25] {
+        group.throughput(Throughput::Bytes(num_bytes));
         add_benches(&mut group, num_bytes, true);
     }
 }
@@ -231,8 +233,6 @@ fn just_writes(c: &mut Criterion) {
 
 #[allow(clippy::too_many_lines)]
 fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: bool) {
-    group.throughput(Throughput::Bytes(num_bytes));
-
     group.bench_with_input(
         BenchmarkId::new("fs::copy", num_bytes),
         &num_bytes,

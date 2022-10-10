@@ -3,8 +3,6 @@ use std::{fs, fs::File, io, num::NonZeroUsize};
 use ftzz::generator::{Generator, NumFilesWithRatio};
 use tempfile::tempdir;
 
-use fuc_engine::remove_dir_all;
-
 #[test]
 fn one_file() {
     let dir = tempdir().unwrap();
@@ -12,7 +10,7 @@ fn one_file() {
     File::create(&file).unwrap();
     assert!(file.exists());
 
-    remove_dir_all(&file).unwrap();
+    fuc_engine::remove_dir_all(&file).unwrap();
 
     assert!(!file.exists());
 }
@@ -24,7 +22,7 @@ fn one_dir() {
     fs::create_dir(&file).unwrap();
     assert!(file.exists());
 
-    remove_dir_all(&file).unwrap();
+    fuc_engine::remove_dir_all(&file).unwrap();
 
     assert!(!file.exists());
 }
@@ -41,7 +39,7 @@ fn large() {
         .generate(&mut io::sink())
         .unwrap();
 
-    remove_dir_all(dir.path()).unwrap();
+    fuc_engine::remove_dir_all(dir.path()).unwrap();
 
     assert!(!dir.path().exists());
 }
