@@ -8,9 +8,6 @@ use ftzz::generator::{Generator, NumFilesWithRatio};
 use tempfile::tempdir;
 
 fn uniform(c: &mut Criterion) {
-    let mut group = c.benchmark_group("uniform");
-    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-
     fn gen_files(dir: &Path, num_files: u64) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
@@ -22,6 +19,9 @@ fn uniform(c: &mut Criterion) {
             .unwrap();
     }
 
+    let mut group = c.benchmark_group("uniform");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+
     for num_files in [10, 1_000, 100_000, 1_000_000] {
         group.sample_size(10);
         group.throughput(Throughput::Elements(num_files));
@@ -31,9 +31,6 @@ fn uniform(c: &mut Criterion) {
 }
 
 fn dir_heavy(c: &mut Criterion) {
-    let mut group = c.benchmark_group("dir_heavy");
-    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-
     fn gen_files(dir: &Path, num_files: u64) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
@@ -49,6 +46,9 @@ fn dir_heavy(c: &mut Criterion) {
             .unwrap();
     }
 
+    let mut group = c.benchmark_group("dir_heavy");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+
     for num_files in [10, 1_000, 100_000, 500_000] {
         group.sample_size(10);
         group.throughput(Throughput::Elements(num_files));
@@ -58,9 +58,6 @@ fn dir_heavy(c: &mut Criterion) {
 }
 
 fn file_heavy(c: &mut Criterion) {
-    let mut group = c.benchmark_group("file_heavy");
-    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-
     fn gen_files(dir: &Path, num_files: u64) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
@@ -73,6 +70,9 @@ fn file_heavy(c: &mut Criterion) {
             .unwrap();
     }
 
+    let mut group = c.benchmark_group("file_heavy");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+
     for num_files in [10, 1_000, 100_000] {
         group.sample_size(10);
         group.throughput(Throughput::Elements(num_files));
@@ -82,9 +82,6 @@ fn file_heavy(c: &mut Criterion) {
 }
 
 fn files_only(c: &mut Criterion) {
-    let mut group = c.benchmark_group("files_only");
-    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-
     fn gen_files(dir: &Path, num_files: u64) {
         let mut file = dir.to_path_buf();
         for i in 0..num_files {
@@ -93,6 +90,9 @@ fn files_only(c: &mut Criterion) {
             file.pop();
         }
     }
+
+    let mut group = c.benchmark_group("files_only");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for num_files in [10, 1_000, 100_000] {
         group.sample_size(10);
@@ -103,9 +103,6 @@ fn files_only(c: &mut Criterion) {
 }
 
 fn deep_dirs(c: &mut Criterion) {
-    let mut group = c.benchmark_group("deep_dirs");
-    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
-
     fn gen_files(dir: &Path, num_files: u64) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
@@ -121,6 +118,9 @@ fn deep_dirs(c: &mut Criterion) {
             .generate(&mut io::sink())
             .unwrap();
     }
+
+    let mut group = c.benchmark_group("deep_dirs");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
 
     for num_files in [10, 1_000, 100_000, 1_000_000] {
         group.sample_size(10);
@@ -191,7 +191,7 @@ fn add_benches(
 }
 
 /// Implementation of the OG post that started all this:
-/// https://github.com/tokio-rs/tokio/issues/4172#issuecomment-945052350
+/// <https://github.com/tokio-rs/tokio/issues/4172#issuecomment-945052350>
 mod og_crappy {
     use std::{
         fs, io,

@@ -12,6 +12,23 @@ use typed_builder::TypedBuilder;
 
 use crate::Error;
 
+/// Removes a directory at this path, after removing all its contents.
+///
+/// This function does **not** follow symbolic links and it will simply remove
+/// the symbolic link itself.
+///
+/// > Note: This function currently starts its own tokio runtime.
+///
+/// # Errors
+///
+/// Returns the underlying I/O errors that occurred.
+pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), Error> {
+    RemoveOp::builder()
+        .files([Cow::Borrowed(path.as_ref())])
+        .build()
+        .run()
+}
+
 #[derive(TypedBuilder, Debug)]
 pub struct RemoveOp<'a, F: IntoIterator<Item = Cow<'a, Path>>> {
     files: F,
