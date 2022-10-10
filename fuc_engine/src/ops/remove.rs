@@ -104,9 +104,6 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
         }
     }
 
-    // TODO consider getting rid of the channel and instead printing errors and
-    //  immediately existing. Maybe library support can be maintained with a feature
-    //  flag that keeps this code around.
     while let Some(task) = rx.recv().await {
         task.await.map_err(Error::TaskJoin)??;
     }
