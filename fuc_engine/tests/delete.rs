@@ -1,6 +1,7 @@
 use std::{fs, fs::File, io, num::NonZeroUsize};
 
 use ftzz::generator::{Generator, NumFilesWithRatio};
+use rstest::rstest;
 use tempfile::tempdir;
 
 #[test]
@@ -27,13 +28,13 @@ fn one_dir() {
     assert!(!file.exists());
 }
 
-#[test]
-fn large() {
+#[rstest]
+fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: usize) {
     let dir = tempdir().unwrap();
     Generator::builder()
         .root_dir(dir.path().to_path_buf())
         .num_files_with_ratio(NumFilesWithRatio::from_num_files(
-            NonZeroUsize::new(100_000).unwrap(),
+            NonZeroUsize::new(num_files).unwrap(),
         ))
         .build()
         .generate(&mut io::sink())
