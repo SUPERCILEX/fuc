@@ -75,17 +75,21 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
             drop(tx);
 
             for task in tasks {
-                dirs.push(task.await.map_err(Error::TaskJoin)??);
+                if let Some(dir) = task.await.map_err(Error::TaskJoin)?? {
+                    dirs.push(dir);
+                }
             }
         }
 
         while let Some(task) = rx.recv().await {
-            dirs.push(task.await.map_err(Error::TaskJoin)??);
+            if let Some(dir) = task.await.map_err(Error::TaskJoin)?? {
+                dirs.push(dir);
+            }
         }
     }
 
-    for dir in dirs.into_iter().rev().flatten() {
-        fs::remove_dir(&dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
+    for dir in dirs.iter().rev() {
+        fs::remove_dir(dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))?;
     }
 
     Ok(())
