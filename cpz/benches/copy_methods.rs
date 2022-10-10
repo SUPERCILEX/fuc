@@ -132,7 +132,7 @@ fn empty_files(c: &mut Criterion) {
         );
     });
 
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     group.bench_function("open", |b| {
         let files = NormalTempFile::create(0, false);
         b.iter(|| {
@@ -149,7 +149,7 @@ fn empty_files(c: &mut Criterion) {
         });
     });
 
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     group.bench_function("openat", |b| {
         let files = NormalTempFile::create(0, false);
         let dir = File::open(files.dir.path()).unwrap();
