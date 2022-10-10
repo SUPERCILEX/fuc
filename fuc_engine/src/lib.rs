@@ -1,6 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 
-use std::{io, path::Path};
+use std::{borrow::Cow, io, path::Path};
 
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -34,5 +34,8 @@ pub enum Error {
 ///
 /// Returns the underlying I/O errors that occurred.
 pub fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), Error> {
-    RemoveOp::builder().files([path.as_ref()]).build().run()
+    RemoveOp::builder()
+        .files([Cow::Borrowed(path.as_ref())])
+        .build()
+        .run()
 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 use clap::{ArgAction, Parser, ValueHint};
 use clap_verbosity_flag::Verbosity;
@@ -43,7 +43,7 @@ fn main() -> Result<(), CliError> {
     let args = Rmz::parse();
 
     RemoveOp::builder()
-        .files(args.files.iter().map(AsRef::as_ref))
+        .files(args.files.into_iter().map(Cow::Owned))
         .force(args.force)
         .preserve_root(args.preserve_root)
         .build()

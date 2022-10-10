@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fs, io,
     num::NonZeroUsize,
     path::{Path, PathBuf},
@@ -12,8 +13,7 @@ use typed_builder::TypedBuilder;
 use crate::Error;
 
 #[derive(TypedBuilder, Debug)]
-pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
-    // TODO make this a variant that's either owned or not. Maybe Cow?
+pub struct RemoveOp<'a, F: IntoIterator<Item = Cow<'a, Path>>> {
     files: F,
     #[builder(default = false)]
     force: bool,
@@ -21,7 +21,7 @@ pub struct RemoveOp<'a, F: IntoIterator<Item = &'a Path>> {
     preserve_root: bool,
 }
 
-impl<'a, F: IntoIterator<Item = &'a Path>> RemoveOp<'a, F> {
+impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     /// Consume and run this remove operation.
     ///
     /// # Errors
@@ -39,7 +39,7 @@ impl<'a, F: IntoIterator<Item = &'a Path>> RemoveOp<'a, F> {
     }
 }
 
-async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
+async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
     op: RemoveOp<'a, F>,
 ) -> Result<(), Error> {
     let mut dirs = Vec::new();
@@ -63,12 +63,12 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = &'a Path>>(
 
                 if is_dir {
                     tasks.push(task::spawn_blocking({
-                        let dir = file.to_path_buf();
+                        let dir = file.into_owned();
                         let tx = tx.clone();
                         move || delete_dir(dir, &tx)
                     }));
                 } else {
-                    fs::remove_file(file)
+                    fs::remove_file(&file)
                         .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
                 }
             }
