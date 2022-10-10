@@ -147,6 +147,7 @@ fn add_benches(
                 },
                 |dir| {
                     fuc_engine::remove_dir_all(dir.path()).unwrap();
+                    assert!(!dir.path().exists());
                     dir
                 },
             );
@@ -165,6 +166,7 @@ fn add_benches(
                 },
                 |dir| {
                     fs::remove_dir_all(dir.path()).unwrap();
+                    assert!(!dir.path().exists());
                     dir
                 },
             );
@@ -183,6 +185,7 @@ fn add_benches(
                 },
                 |dir| {
                     og_crappy::remove_dir_all(dir.path()).unwrap();
+                    assert!(!dir.path().exists());
                     dir
                 },
             );
@@ -201,6 +204,7 @@ fn add_benches(
                 },
                 |dir| {
                     remove_dir_all::remove_dir_all(dir.path()).unwrap();
+                    assert!(!dir.path().exists());
                     dir
                 },
             );

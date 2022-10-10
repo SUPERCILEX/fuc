@@ -1,5 +1,4 @@
 #![allow(clippy::module_name_repetitions)]
-#![feature(io_error_more)]
 
 use std::io;
 
