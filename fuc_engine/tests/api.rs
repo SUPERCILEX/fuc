@@ -16,6 +16,6 @@ fn api() {
     let json = read_to_string(json_path).unwrap();
     let api = PublicApi::from_rustdoc_json_str(&json, public_api::Options::default()).unwrap();
     for public_item in api.items {
-        writeln!(goldenfile, "{}", public_item).unwrap();
+        writeln!(goldenfile, "{public_item}").unwrap();
     }
 }
