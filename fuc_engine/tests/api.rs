@@ -1,21 +1,22 @@
-use std::{fs::read_to_string, io::Write};
+use std::fmt::Write;
 
-use goldenfile::Mint;
+use expect_test::expect_file;
 use public_api::PublicApi;
-use rustdoc_json::BuildOptions;
 
 #[test]
-#[ignore] // TODO https://github.com/Enselic/cargo-public-api/issues/175
+#[cfg_attr(miri, ignore)] // gnu_get_libc_version breaks miri
 fn api() {
-    let json_path =
-        rustdoc_json::Builder::build(BuildOptions::default().all_features(true)).unwrap();
+    let json_path = rustdoc_json::Builder::default()
+        .all_features(true)
+        .build()
+        .unwrap();
 
-    let mut mint = Mint::new(".");
-    let mut goldenfile = mint.new_goldenfile("api.golden").unwrap();
-
-    let json = read_to_string(json_path).unwrap();
-    let api = PublicApi::from_rustdoc_json_str(&json, public_api::Options::default()).unwrap();
-    for public_item in api.items {
-        writeln!(goldenfile, "{public_item}").unwrap();
+    let mut golden = String::new();
+    {
+        let api = PublicApi::from_rustdoc_json(json_path, public_api::Options::default()).unwrap();
+        for public_item in api.items() {
+            writeln!(golden, "{public_item}").unwrap();
+        }
     }
+    expect_file!["../api.golden"].assert_eq(&golden);
 }

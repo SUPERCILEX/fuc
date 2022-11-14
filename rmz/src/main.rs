@@ -63,10 +63,10 @@ fn main() -> Result<(), CliError> {
 
 #[cfg(test)]
 mod cli_tests {
-    use std::io::Write;
+    use std::fmt::Write;
 
     use clap::{Command, CommandFactory};
-    use goldenfile::Mint;
+    use expect_test::expect_file;
 
     use super::*;
 
@@ -76,19 +76,20 @@ mod cli_tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)] // wrap_help breaks miri
     fn help_for_review() {
         let mut command = Rmz::command();
 
         command.build();
 
-        let mut mint = Mint::new(".");
-        let mut long = mint.new_goldenfile("command-reference.golden").unwrap();
-        let mut short = mint
-            .new_goldenfile("command-reference-short.golden")
-            .unwrap();
+        let mut long = String::new();
+        let mut short = String::new();
 
         write_help(&mut long, &mut command, LongOrShortHelp::Long);
         write_help(&mut short, &mut command, LongOrShortHelp::Short);
+
+        expect_file!["../command-reference.golden"].assert_eq(&long);
+        expect_file!["../command-reference-short.golden"].assert_eq(&short);
     }
 
     #[derive(Copy, Clone)]
@@ -98,10 +99,15 @@ mod cli_tests {
     }
 
     fn write_help(buffer: &mut impl Write, cmd: &mut Command, long_or_short_help: LongOrShortHelp) {
-        match long_or_short_help {
-            LongOrShortHelp::Long => cmd.write_long_help(buffer).unwrap(),
-            LongOrShortHelp::Short => cmd.write_help(buffer).unwrap(),
-        }
+        write!(
+            buffer,
+            "{}",
+            match long_or_short_help {
+                LongOrShortHelp::Long => cmd.render_long_help(),
+                LongOrShortHelp::Short => cmd.render_help(),
+            }
+        )
+        .unwrap();
 
         for sub in cmd.get_subcommands_mut() {
             writeln!(buffer).unwrap();
