@@ -2,7 +2,7 @@ pub mod fuc_engine
 pub enum fuc_engine::Error
 pub enum variant fuc_engine::Error::Internal
 pub enum variant fuc_engine::Error::Io
-pub struct field fuc_engine::Error::Io::context: String
+pub struct field fuc_engine::Error::Io::context: Cow<'static, str>
 pub struct field fuc_engine::Error::Io::error: io::Error
 pub enum variant fuc_engine::Error::PreserveRoot
 pub enum variant fuc_engine::Error::RuntimeCreation(io::Error)

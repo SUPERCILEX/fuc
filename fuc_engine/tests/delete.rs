@@ -19,7 +19,7 @@ fn one_file() {
 #[test]
 fn one_dir() {
     let dir = tempdir().unwrap();
-    let file = dir.path().join("file");
+    let file = dir.path().join("dir");
     fs::create_dir(&file).unwrap();
     assert!(file.exists());
 

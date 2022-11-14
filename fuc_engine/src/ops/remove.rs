@@ -1,17 +1,29 @@
 use std::{
     borrow::Cow,
+    cell::UnsafeCell,
+    ffi::CStr,
     fs, io,
     num::NonZeroUsize,
+    os::unix::io::OwnedFd,
     path::Path,
-    sync::atomic::{AtomicIsize, Ordering},
+    sync::{
+        atomic::{AtomicIsize, Ordering},
+        Arc,
+    },
     thread,
 };
 
+use nix::{
+    dents::RawDir,
+    errno::Errno,
+    fcntl::{open, openat, OFlag},
+    file_type::FileType,
+    sys::stat::Mode,
+    unistd::{unlinkat, UnlinkatFlags},
+};
 use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
-
-use tree::{Arcable, TreeNode};
 
 use crate::Error;
 
@@ -80,13 +92,20 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                 }
                 r => r,
             }
-            .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
+            .map_io_err(|| Cow::Owned(format!("Failed to read metadata for file: {file:?}")))?
             .is_dir();
 
             if is_dir {
                 tasks.push(task::spawn_blocking({
                     let node = TreeNode {
-                        path: file.into_owned(),
+                        file: open(
+                            file.as_ref(),
+                            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                            Mode::empty(),
+                        )
+                        .map_io_err(|| {
+                            Cow::Owned(format!("Failed to open directory: {:?}", file.as_ref()))
+                        })?,
                         parent: None,
                         remaining_children: AtomicIsize::new(0),
                     };
@@ -94,7 +113,8 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                     move || delete_dir(node, &tx)
                 }));
             } else {
-                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+                fs::remove_file(&file)
+                    .map_io_err(|| Cow::Owned(format!("Failed to delete file: {file:?}")))?;
             }
         }
         drop(tx);
@@ -115,42 +135,54 @@ fn delete_dir(
     node: TreeNode,
     tasks: &UnboundedSender<JoinHandle<Result<(), Error>>>,
 ) -> Result<(), Error> {
-    let mut node = Arcable::new(node);
+    const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
+    const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
+
+    let mut node = Arc::new(node);
 
     {
+        thread_local! {
+            static BUF: UnsafeCell<Vec<u8>> = UnsafeCell::new(Vec::with_capacity(8192));
+        }
+
         let mut children = 0;
 
-        // TODO use getdents64 on linux
-        let files = fs::read_dir(&node.path)
-            .map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
-        for file in files {
-            let file = file
-                .map_io_err(|| format!("DirEntry fetch failed for directory: {:?}", node.path))?;
-            let is_dir = file
-                .file_type()
-                .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
-                .is_dir();
+        BUF.with(|buf| {
+            for file in RawDir::new(&node.file, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
+                // TODO add a function to read the file path from /proc or fcntl
+                let file = file.map_io_err(|| Cow::Borrowed("Directory read failed"))?;
+                if file.name == DOT || file.name == DOT_DOT {
+                    continue;
+                }
 
-            if is_dir {
-                children += 1;
-                tasks
-                    .send(task::spawn_blocking({
-                        let node = TreeNode {
-                            // TODO see if we can instead just pass in a file descriptor and use the
-                            //  *at syscalls to reduce memory allocations
-                            path: file.path(),
-                            parent: Some(node.arc()),
-                            remaining_children: AtomicIsize::new(0),
-                        };
-                        let tasks = tasks.clone();
-                        move || delete_dir(node, &tasks)
-                    }))
-                    .map_err(|_| Error::Internal)?;
-            } else {
-                let file = file.path();
-                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+                if file.file_type == FileType::Directory {
+                    children += 1;
+                    tasks
+                        .send(task::spawn_blocking({
+                            let node = TreeNode {
+                                file: openat(
+                                    &node.file,
+                                    file.name,
+                                    OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                                    Mode::empty(),
+                                )
+                                .map_io_err(|| {
+                                    Cow::Owned(format!("Failed to open directory: {:?}", file.name))
+                                })?,
+                                parent: Some(node.clone()),
+                                remaining_children: AtomicIsize::new(0),
+                            };
+                            let tasks = tasks.clone();
+                            move || delete_dir(node, &tasks)
+                        }))
+                        .map_err(|_| Error::Internal)?;
+                } else {
+                    unlinkat(&node.file, file.name, UnlinkatFlags::NoRemoveDir)
+                        .map_io_err(|| Cow::Owned(format!("Failed to delete file: {file:?}")))?;
+                }
             }
-        }
+            Ok(())
+        })?;
 
         if children > 0 {
             children = children
@@ -164,28 +196,28 @@ fn delete_dir(
         }
     }
 
-    fs::remove_dir(&node.path)
-        .map_io_err(|| format!("Failed to delete directory: {:?}", node.path))?;
+    unlinkat(&node.file, DOT, UnlinkatFlags::RemoveDir)
+        .map_io_err(|| Cow::Borrowed("Failed to delete directory"))?;
 
     while let Some(parent) = &node.parent {
         if parent.remaining_children.fetch_sub(1, Ordering::Relaxed) != 1 {
             break;
         }
 
-        node = parent.clone().into();
-        fs::remove_dir(&node.path)
-            .map_io_err(|| format!("Failed to delete directory: {:?}", node.path))?;
+        node = parent.clone();
+        unlinkat(&node.file, DOT, UnlinkatFlags::RemoveDir)
+            .map_io_err(|| Cow::Borrowed("Failed to delete directory"))?;
     }
 
     Ok(())
 }
 
 trait IoErr<Out> {
-    fn map_io_err(self, f: impl FnOnce() -> String) -> Out;
+    fn map_io_err(self, f: impl FnOnce() -> Cow<'static, str>) -> Out;
 }
 
 impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
-    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
+    fn map_io_err(self, context: impl FnOnce() -> Cow<'static, str>) -> Result<T, Error> {
         self.map_err(|error| Error::Io {
             error,
             context: context(),
@@ -193,60 +225,15 @@ impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
     }
 }
 
-mod tree {
-    use std::{
-        hint::unreachable_unchecked,
-        mem,
-        ops::Deref,
-        path::PathBuf,
-        sync::{atomic::AtomicIsize, Arc},
-    };
-
-    #[derive(Default)]
-    pub struct TreeNode {
-        pub path: PathBuf,
-        // TODO manually implement this Arc with our remaining_children atomic
-        pub parent: Option<Arc<TreeNode>>,
-        pub remaining_children: AtomicIsize,
+impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
+    fn map_io_err(self, context: impl FnOnce() -> Cow<'static, str>) -> Result<T, Error> {
+        self.map_err(io::Error::from).map_io_err(context)
     }
+}
 
-    pub struct Arcable<T> {
-        t: Result<T, Arc<T>>,
-    }
-
-    impl<T: Default> Arcable<T> {
-        pub const fn new(t: T) -> Self {
-            Self { t: Ok(t) }
-        }
-
-        pub fn arc(&mut self) -> Arc<T> {
-            if self.t.is_ok() {
-                let t = mem::replace(&mut self.t, Ok(T::default()));
-                let t = unsafe { t.unwrap_unchecked() };
-                drop(mem::replace(&mut self.t, Err(Arc::new(t))));
-            }
-
-            match &self.t {
-                Err(arc) => arc.clone(),
-                Ok(_) => unsafe { unreachable_unchecked() },
-            }
-        }
-    }
-
-    impl<T> Deref for Arcable<T> {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            match &self.t {
-                Ok(t) => t,
-                Err(arc) => arc,
-            }
-        }
-    }
-
-    impl<T> From<Arc<T>> for Arcable<T> {
-        fn from(arc: Arc<T>) -> Self {
-            Self { t: Err(arc) }
-        }
-    }
+pub struct TreeNode {
+    pub file: OwnedFd,
+    // TODO manually implement this Arc with our remaining_children atomic
+    pub parent: Option<Arc<TreeNode>>,
+    pub remaining_children: AtomicIsize,
 }

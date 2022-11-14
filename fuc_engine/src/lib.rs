@@ -1,6 +1,9 @@
+#![feature(const_cstr_methods)]
+#![feature(const_result_drop)]
+#![feature(const_option)]
 #![allow(clippy::module_name_repetitions)]
 
-use std::io;
+use std::{borrow::Cow, io};
 
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -14,7 +17,10 @@ pub enum Error {
     #[error("Failed to create the async runtime.")]
     RuntimeCreation(io::Error),
     #[error("An IO error occurred.")]
-    Io { error: io::Error, context: String },
+    Io {
+        error: io::Error,
+        context: Cow<'static, str>,
+    },
     #[error("An attempt was made to delete `/`.")]
     PreserveRoot,
     #[error("Failed to retrieve subtask results.")]
