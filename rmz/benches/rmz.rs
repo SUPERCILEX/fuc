@@ -258,12 +258,12 @@ mod og_crappy {
         let tasks = tokio::task::spawn_blocking(move || -> io::Result<_> {
             let mut tasks = Vec::new();
 
-            for child in fs::read_dir(&path)? {
+            for child in fs::read_dir(path)? {
                 let child = child?;
                 if child.file_type()?.is_dir() {
                     tasks.push(spawn_remove_dir_all_recursive(&child.path()));
                 } else {
-                    fs::remove_file(&child.path())?;
+                    fs::remove_file(child.path())?;
                 }
             }
 

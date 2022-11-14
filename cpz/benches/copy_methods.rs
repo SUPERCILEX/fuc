@@ -119,7 +119,7 @@ fn empty_files(c: &mut Criterion) {
                 use nix::sys::stat::{mknodat, Mode, SFlag};
                 mknodat(
                     dir.as_raw_fd(),
-                    files.to.as_path(),
+                    files.to.file_name().unwrap(),
                     SFlag::S_IFREG,
                     Mode::empty(),
                     0,
@@ -135,6 +135,7 @@ fn empty_files(c: &mut Criterion) {
     #[cfg(unix)]
     group.bench_function("open", |b| {
         let files = NormalTempFile::create(0, false);
+        let path = files.to.as_path();
         b.iter(|| {
             use nix::{
                 fcntl::{open, OFlag},
@@ -142,7 +143,7 @@ fn empty_files(c: &mut Criterion) {
             };
             use std::os::fd::FromRawFd;
 
-            let fd = open(files.to.as_path(), OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
+            let fd = open(path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
             unsafe {
                 File::from_raw_fd(fd);
             }
@@ -153,6 +154,7 @@ fn empty_files(c: &mut Criterion) {
     group.bench_function("openat", |b| {
         let files = NormalTempFile::create(0, false);
         let dir = File::open(files.dir.path()).unwrap();
+        let path = files.to.file_name().unwrap();
         b.iter(|| {
             use nix::{
                 fcntl::{openat, OFlag},
@@ -160,13 +162,7 @@ fn empty_files(c: &mut Criterion) {
             };
             use std::os::fd::FromRawFd;
 
-            let fd = openat(
-                dir.as_raw_fd(),
-                files.to.as_path(),
-                OFlag::O_CREAT,
-                Mode::S_IRWXU,
-            )
-            .unwrap();
+            let fd = openat(dir.as_raw_fd(), path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
             unsafe {
                 File::from_raw_fd(fd);
             }
