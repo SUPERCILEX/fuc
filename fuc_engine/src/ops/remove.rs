@@ -2,10 +2,10 @@ use std::{
     borrow::Cow,
     cell::UnsafeCell,
     ffi::CStr,
+    fmt::Debug,
     fs, io,
     num::NonZeroUsize,
-    os::unix::io::OwnedFd,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicIsize, Ordering},
         Arc,
@@ -20,12 +20,16 @@ use nix::{
     file_type::FileType,
     sys::stat::Mode,
     unistd::{unlinkat, UnlinkatFlags},
+    AT_FDCWD,
 };
 use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
 
-use crate::Error;
+use crate::{
+    ops::remove::tree::{CStringOrPathBuf, OwnedOrBorrowedFd, TreeNode},
+    Error,
+};
 
 /// Removes a directory at this path, after removing all its contents.
 ///
@@ -98,15 +102,23 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
             if is_dir {
                 tasks.push(task::spawn_blocking({
                     let node = TreeNode {
-                        file: open(
-                            file.as_ref(),
-                            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                            Mode::empty(),
-                        )
-                        .map_io_err(|| {
-                            Cow::Owned(format!("Failed to open directory: {:?}", file.as_ref()))
-                        })?,
-                        parent: None,
+                        file: OwnedOrBorrowedFd::Owned(
+                            open(
+                                file.as_ref(),
+                                OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                                Mode::empty(),
+                            )
+                            .map_io_err(|| {
+                                Cow::Owned(format!("Failed to open directory: {:?}", file.as_ref()))
+                            })?,
+                        ),
+                        file_name: CStringOrPathBuf::PathBuf(file.into_owned()),
+                        parent: Some(Arc::new(TreeNode {
+                            file: OwnedOrBorrowedFd::Borrowed(*AT_FDCWD),
+                            file_name: CStringOrPathBuf::PathBuf(PathBuf::new()),
+                            parent: None,
+                            remaining_children: AtomicIsize::new(1),
+                        })),
                         remaining_children: AtomicIsize::new(0),
                     };
                     let tx = tx.clone();
@@ -135,9 +147,6 @@ fn delete_dir(
     node: TreeNode,
     tasks: &UnboundedSender<JoinHandle<Result<(), Error>>>,
 ) -> Result<(), Error> {
-    const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
-    const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
-
     let mut node = Arc::new(node);
 
     {
@@ -149,8 +158,12 @@ fn delete_dir(
 
         BUF.with(|buf| {
             for file in RawDir::new(&node.file, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
-                // TODO add a function to read the file path from /proc or fcntl
-                let file = file.map_io_err(|| Cow::Borrowed("Directory read failed"))?;
+                const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
+                const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
+
+                let file = file.map_io_err(|| {
+                    Cow::Owned(format!("Failed to read directory: {:?}", node.file_name))
+                })?;
                 if file.name == DOT || file.name == DOT_DOT {
                     continue;
                 }
@@ -160,15 +173,21 @@ fn delete_dir(
                     tasks
                         .send(task::spawn_blocking({
                             let node = TreeNode {
-                                file: openat(
-                                    &node.file,
-                                    file.name,
-                                    OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                                    Mode::empty(),
-                                )
-                                .map_io_err(|| {
-                                    Cow::Owned(format!("Failed to open directory: {:?}", file.name))
-                                })?,
+                                file: OwnedOrBorrowedFd::Owned(
+                                    openat(
+                                        &node.file,
+                                        file.name,
+                                        OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                                        Mode::empty(),
+                                    )
+                                    .map_io_err(|| {
+                                        Cow::Owned(format!(
+                                            "Failed to open directory: {:?}",
+                                            node.file_name
+                                        ))
+                                    })?,
+                                ),
+                                file_name: CStringOrPathBuf::CString(file.name.to_owned()),
                                 parent: Some(node.clone()),
                                 remaining_children: AtomicIsize::new(0),
                             };
@@ -196,17 +215,15 @@ fn delete_dir(
         }
     }
 
-    unlinkat(&node.file, DOT, UnlinkatFlags::RemoveDir)
-        .map_io_err(|| Cow::Borrowed("Failed to delete directory"))?;
-
     while let Some(parent) = &node.parent {
+        unlinkat(&parent.file, &node.file_name, UnlinkatFlags::RemoveDir).map_io_err(|| {
+            Cow::Owned(format!("Failed to delete directory: {:?}", node.file_name))
+        })?;
+
         if parent.remaining_children.fetch_sub(1, Ordering::Relaxed) != 1 {
             break;
         }
-
         node = parent.clone();
-        unlinkat(&node.file, DOT, UnlinkatFlags::RemoveDir)
-            .map_io_err(|| Cow::Borrowed("Failed to delete directory"))?;
     }
 
     Ok(())
@@ -231,9 +248,75 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
     }
 }
 
-pub struct TreeNode {
-    pub file: OwnedFd,
-    // TODO manually implement this Arc with our remaining_children atomic
-    pub parent: Option<Arc<TreeNode>>,
-    pub remaining_children: AtomicIsize,
+mod tree {
+    use nix::NixPath;
+    use std::{
+        ffi::{CStr, CString},
+        fmt::{Debug, Formatter},
+        os::unix::io::{AsFd, BorrowedFd, OwnedFd},
+        path::PathBuf,
+        sync::{atomic::AtomicIsize, Arc},
+    };
+
+    pub struct TreeNode {
+        pub file: OwnedOrBorrowedFd,
+        pub file_name: CStringOrPathBuf,
+        // TODO manually implement this Arc with our remaining_children atomic
+        pub parent: Option<Arc<TreeNode>>,
+        pub remaining_children: AtomicIsize,
+    }
+
+    pub enum CStringOrPathBuf {
+        CString(CString),
+        PathBuf(PathBuf),
+    }
+
+    impl NixPath for CStringOrPathBuf {
+        fn is_empty(&self) -> bool {
+            match self {
+                Self::CString(c) => NixPath::is_empty(c.as_c_str()),
+                Self::PathBuf(p) => NixPath::is_empty(p),
+            }
+        }
+
+        fn len(&self) -> usize {
+            match self {
+                Self::CString(c) => NixPath::len(c.as_c_str()),
+                Self::PathBuf(p) => NixPath::len(p),
+            }
+        }
+
+        fn with_nix_path<T, F>(&self, f: F) -> nix::Result<T>
+        where
+            F: FnOnce(&CStr) -> T,
+        {
+            match self {
+                Self::CString(c) => NixPath::with_nix_path(c.as_c_str(), f),
+                Self::PathBuf(p) => NixPath::with_nix_path(p, f),
+            }
+        }
+    }
+
+    impl Debug for CStringOrPathBuf {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::CString(c) => Debug::fmt(c, f),
+                Self::PathBuf(p) => Debug::fmt(p, f),
+            }
+        }
+    }
+
+    pub enum OwnedOrBorrowedFd {
+        Owned(OwnedFd),
+        Borrowed(BorrowedFd<'static>),
+    }
+
+    impl AsFd for OwnedOrBorrowedFd {
+        fn as_fd(&self) -> BorrowedFd<'_> {
+            match self {
+                Self::Owned(o) => o.as_fd(),
+                Self::Borrowed(b) => b.as_fd(),
+            }
+        }
+    }
 }
