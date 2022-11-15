@@ -1,11 +1,12 @@
 use std::{
     borrow::Cow,
     cell::UnsafeCell,
-    ffi::CStr,
+    ffi::{CStr, CString, OsString},
     fmt::Debug,
     fs, io,
     num::NonZeroUsize,
-    path::{Path, PathBuf},
+    os::unix::ffi::OsStringExt,
+    path::Path,
     sync::{
         atomic::{AtomicIsize, Ordering},
         Arc,
@@ -27,7 +28,7 @@ use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    ops::remove::tree::{CStringOrPathBuf, OwnedOrBorrowedFd, TreeNode},
+    ops::remove::tree::{OwnedOrBorrowedFd, TreeNode},
     Error,
 };
 
@@ -112,10 +113,11 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                                 format!("Failed to open directory: {:?}", file.as_ref())
                             })?,
                         ),
-                        file_name: CStringOrPathBuf::PathBuf(file.into_owned()),
+                        file_name: CString::new(OsString::from(file.into_owned()).into_vec())
+                            .unwrap(),
                         parent: Some(Arc::new(TreeNode {
                             file: OwnedOrBorrowedFd::Borrowed(*AT_FDCWD),
-                            file_name: CStringOrPathBuf::PathBuf(PathBuf::new()),
+                            file_name: CString::default(),
                             parent: None,
                             remaining_children: AtomicIsize::new(1),
                         })),
@@ -182,7 +184,7 @@ fn delete_dir(
                                         format!("Failed to open directory: {:?}", node.file_name)
                                     })?,
                                 ),
-                                file_name: CStringOrPathBuf::CString(file.name.to_owned()),
+                                file_name: file.name.to_owned(),
                                 parent: Some(node.clone()),
                                 remaining_children: AtomicIsize::new(0),
                             };
@@ -211,8 +213,12 @@ fn delete_dir(
     }
 
     while let Some(parent) = &node.parent {
-        unlinkat(&parent.file, &node.file_name, UnlinkatFlags::RemoveDir)
-            .map_io_err(|| format!("Failed to delete directory: {:?}", node.file_name))?;
+        unlinkat(
+            &parent.file,
+            node.file_name.as_c_str(),
+            UnlinkatFlags::RemoveDir,
+        )
+        .map_io_err(|| format!("Failed to delete directory: {:?}", node.file_name))?;
 
         if parent.remaining_children.fetch_sub(1, Ordering::Relaxed) != 1 {
             break;
@@ -243,61 +249,18 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
 }
 
 mod tree {
-    use nix::NixPath;
     use std::{
-        ffi::{CStr, CString},
-        fmt::{Debug, Formatter},
+        ffi::CString,
         os::unix::io::{AsFd, BorrowedFd, OwnedFd},
-        path::PathBuf,
         sync::{atomic::AtomicIsize, Arc},
     };
 
     pub struct TreeNode {
         pub file: OwnedOrBorrowedFd,
-        pub file_name: CStringOrPathBuf,
+        pub file_name: CString,
         // TODO manually implement this Arc with our remaining_children atomic
         pub parent: Option<Arc<TreeNode>>,
         pub remaining_children: AtomicIsize,
-    }
-
-    pub enum CStringOrPathBuf {
-        CString(CString),
-        PathBuf(PathBuf),
-    }
-
-    impl NixPath for CStringOrPathBuf {
-        fn is_empty(&self) -> bool {
-            match self {
-                Self::CString(c) => NixPath::is_empty(c.as_c_str()),
-                Self::PathBuf(p) => NixPath::is_empty(p),
-            }
-        }
-
-        fn len(&self) -> usize {
-            match self {
-                Self::CString(c) => NixPath::len(c.as_c_str()),
-                Self::PathBuf(p) => NixPath::len(p),
-            }
-        }
-
-        fn with_nix_path<T, F>(&self, f: F) -> nix::Result<T>
-        where
-            F: FnOnce(&CStr) -> T,
-        {
-            match self {
-                Self::CString(c) => NixPath::with_nix_path(c.as_c_str(), f),
-                Self::PathBuf(p) => NixPath::with_nix_path(p, f),
-            }
-        }
-    }
-
-    impl Debug for CStringOrPathBuf {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::CString(c) => Debug::fmt(c, f),
-                Self::PathBuf(p) => Debug::fmt(p, f),
-            }
-        }
     }
 
     pub enum OwnedOrBorrowedFd {
