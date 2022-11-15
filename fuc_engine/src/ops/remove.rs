@@ -96,7 +96,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                 }
                 r => r,
             }
-            .map_io_err(|| Cow::Owned(format!("Failed to read metadata for file: {file:?}")))?
+            .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
             .is_dir();
 
             if is_dir {
@@ -109,7 +109,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                                 Mode::empty(),
                             )
                             .map_io_err(|| {
-                                Cow::Owned(format!("Failed to open directory: {:?}", file.as_ref()))
+                                format!("Failed to open directory: {:?}", file.as_ref())
                             })?,
                         ),
                         file_name: CStringOrPathBuf::PathBuf(file.into_owned()),
@@ -125,8 +125,7 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                     move || delete_dir(node, &tx)
                 }));
             } else {
-                fs::remove_file(&file)
-                    .map_io_err(|| Cow::Owned(format!("Failed to delete file: {file:?}")))?;
+                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
             }
         }
         drop(tx);
@@ -161,9 +160,8 @@ fn delete_dir(
                 const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
                 const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
-                let file = file.map_io_err(|| {
-                    Cow::Owned(format!("Failed to read directory: {:?}", node.file_name))
-                })?;
+                let file =
+                    file.map_io_err(|| format!("Failed to read directory: {:?}", node.file_name))?;
                 if file.name == DOT || file.name == DOT_DOT {
                     continue;
                 }
@@ -181,10 +179,7 @@ fn delete_dir(
                                         Mode::empty(),
                                     )
                                     .map_io_err(|| {
-                                        Cow::Owned(format!(
-                                            "Failed to open directory: {:?}",
-                                            node.file_name
-                                        ))
+                                        format!("Failed to open directory: {:?}", node.file_name)
                                     })?,
                                 ),
                                 file_name: CStringOrPathBuf::CString(file.name.to_owned()),
@@ -197,7 +192,7 @@ fn delete_dir(
                         .map_err(|_| Error::Internal)?;
                 } else {
                     unlinkat(&node.file, file.name, UnlinkatFlags::NoRemoveDir)
-                        .map_io_err(|| Cow::Owned(format!("Failed to delete file: {file:?}")))?;
+                        .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
                 }
             }
             Ok(())
@@ -216,9 +211,8 @@ fn delete_dir(
     }
 
     while let Some(parent) = &node.parent {
-        unlinkat(&parent.file, &node.file_name, UnlinkatFlags::RemoveDir).map_io_err(|| {
-            Cow::Owned(format!("Failed to delete directory: {:?}", node.file_name))
-        })?;
+        unlinkat(&parent.file, &node.file_name, UnlinkatFlags::RemoveDir)
+            .map_io_err(|| format!("Failed to delete directory: {:?}", node.file_name))?;
 
         if parent.remaining_children.fetch_sub(1, Ordering::Relaxed) != 1 {
             break;
@@ -230,11 +224,11 @@ fn delete_dir(
 }
 
 trait IoErr<Out> {
-    fn map_io_err(self, f: impl FnOnce() -> Cow<'static, str>) -> Out;
+    fn map_io_err(self, f: impl FnOnce() -> String) -> Out;
 }
 
 impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
-    fn map_io_err(self, context: impl FnOnce() -> Cow<'static, str>) -> Result<T, Error> {
+    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
         self.map_err(|error| Error::Io {
             error,
             context: context(),
@@ -243,7 +237,7 @@ impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
 }
 
 impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
-    fn map_io_err(self, context: impl FnOnce() -> Cow<'static, str>) -> Result<T, Error> {
+    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
         self.map_err(io::Error::from).map_io_err(context)
     }
 }
