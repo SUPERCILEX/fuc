@@ -3,17 +3,15 @@ use std::{
     cell::UnsafeCell,
     ffi::{CStr, CString, OsString},
     fmt::Debug,
-    fs, io,
+    fs, io, mem,
     num::NonZeroUsize,
     os::unix::{
         ffi::OsStringExt,
         io::{AsRawFd, FromRawFd, OwnedFd},
     },
     path::Path,
-    sync::{
-        atomic::{AtomicIsize, Ordering},
-        Arc,
-    },
+    ptr::NonNull,
+    sync::atomic::{AtomicIsize, Ordering},
     thread,
 };
 
@@ -68,7 +66,7 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
         // TODO see if we should instead wait until we've seen a directory to boot up
         //  the runtime
         let parallelism =
-            thread::available_parallelism().unwrap_or(unsafe { NonZeroUsize::new_unchecked(1) });
+            thread::available_parallelism().unwrap_or(const { NonZeroUsize::new(1).unwrap() });
         let runtime = tokio::runtime::Builder::new_current_thread()
             .max_blocking_threads(parallelism.get())
             .build()
@@ -111,14 +109,17 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
                         .map_io_err(|| format!("Failed to open directory: {:?}", file.as_ref()))?,
                         file_name: CString::new(OsString::from(file.into_owned()).into_vec())
                             .unwrap(),
-                        parent: Some(Arc::new(TreeNode {
-                            // TODO Dropping this will fail. Rust doesn't do anything in that case,
-                            //  but still, we should avoid dropping the OwnedFd when parent is None.
-                            file: unsafe { OwnedFd::from_raw_fd(AT_FDCWD.as_raw_fd()) },
-                            file_name: CString::default(),
-                            parent: None,
-                            remaining_children: AtomicIsize::new(1),
-                        })),
+                        parent: Some(
+                            Box::leak(Box::new(TreeNode {
+                                // SAFETY: We make sure to not drop this in delete_dir if parent is
+                                // None.
+                                file: unsafe { OwnedFd::from_raw_fd(AT_FDCWD.as_raw_fd()) },
+                                file_name: CString::default(),
+                                parent: None,
+                                remaining_children: AtomicIsize::new(1),
+                            }))
+                            .into(),
+                        ),
                         remaining_children: AtomicIsize::new(0),
                     };
                     let tx = tx.clone();
@@ -146,7 +147,9 @@ fn delete_dir(
     node: TreeNode,
     tasks: &UnboundedSender<JoinHandle<Result<(), Error>>>,
 ) -> Result<(), Error> {
-    let mut node = Arc::new(node);
+    // TODO don't always allocate this.
+    // TODO fix memory leaks on errors
+    let node = Box::leak(Box::new(node));
 
     {
         thread_local! {
@@ -156,6 +159,7 @@ fn delete_dir(
         let mut children = 0;
 
         BUF.with(|buf| {
+            let parent = Some(node.into());
             for file in RawDir::new(&node.file, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
                 const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
                 const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
@@ -181,7 +185,7 @@ fn delete_dir(
                                     format!("Failed to open directory: {:?}", node.file_name)
                                 })?,
                                 file_name: file.name.to_owned(),
-                                parent: Some(node.clone()),
+                                parent,
                                 remaining_children: AtomicIsize::new(0),
                             };
                             let tasks = tasks.clone();
@@ -208,18 +212,45 @@ fn delete_dir(
         }
     }
 
-    while let Some(parent) = &node.parent {
-        unlinkat(
-            &parent.file,
-            node.file_name.as_c_str(),
-            UnlinkatFlags::RemoveDir,
-        )
-        .map_io_err(|| format!("Failed to delete directory: {:?}", node.file_name))?;
+    'done: {
+        unsafe {
+            let mut next = NonNull::from(node);
+            while let Some(parent) = next.as_ref().parent {
+                unlinkat(
+                    &parent.as_ref().file,
+                    next.as_ref().file_name.as_c_str(),
+                    UnlinkatFlags::RemoveDir,
+                )
+                .map_io_err(|| {
+                    format!("Failed to delete directory: {:?}", next.as_ref().file_name)
+                })?;
 
-        if parent.remaining_children.fetch_sub(1, Ordering::Relaxed) != 1 {
-            break;
+                // We must be the last user of this allocation b/c:
+                // - If we came from outside the loop, we would have exited above in the
+                //   children check.
+                // - If we're coming from inside the loop, the remaining_children check operates
+                //   on the parent and would block the next iteration.
+                drop(Box::from_raw(next.as_ptr()));
+
+                // TODO using Relaxed here is almost certainly wrong. Do some more research and
+                //  figure out the correct ordering.
+                if parent
+                    .as_ref()
+                    .remaining_children
+                    .fetch_sub(1, Ordering::Relaxed)
+                    != 1
+                {
+                    // There are still active children, let the last of them do the cleanup.
+                    break 'done;
+                }
+                next = parent;
+            }
+
+            let root = Box::from_raw(next.as_ptr());
+            // See comment in run_deletion_scheduler, this isn't a real fd so don't drop it.
+            debug_assert_eq!(root.file.as_raw_fd(), AT_FDCWD.as_raw_fd());
+            mem::forget(root.file);
         }
-        node = parent.clone();
     }
 
     Ok(())
@@ -245,17 +276,14 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
 }
 
 mod tree {
-    use std::{
-        ffi::CString,
-        os::unix::io::OwnedFd,
-        sync::{atomic::AtomicIsize, Arc},
-    };
+    use std::{ffi::CString, os::unix::io::OwnedFd, ptr::NonNull, sync::atomic::AtomicIsize};
 
     pub struct TreeNode {
         pub file: OwnedFd,
         pub file_name: CString,
-        // TODO manually implement this Arc with our remaining_children atomic
-        pub parent: Option<Arc<TreeNode>>,
+        pub parent: Option<NonNull<TreeNode>>,
         pub remaining_children: AtomicIsize,
     }
+
+    unsafe impl Send for TreeNode {}
 }

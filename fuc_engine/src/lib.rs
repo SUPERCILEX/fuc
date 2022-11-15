@@ -1,6 +1,7 @@
 #![feature(const_cstr_methods)]
 #![feature(const_result_drop)]
 #![feature(const_option)]
+#![feature(inline_const)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::io;
