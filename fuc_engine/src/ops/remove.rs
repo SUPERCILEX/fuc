@@ -5,7 +5,10 @@ use std::{
     fmt::Debug,
     fs, io,
     num::NonZeroUsize,
-    os::unix::ffi::OsStringExt,
+    os::unix::{
+        ffi::OsStringExt,
+        io::{AsRawFd, FromRawFd, OwnedFd},
+    },
     path::Path,
     sync::{
         atomic::{AtomicIsize, Ordering},
@@ -27,10 +30,7 @@ use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
 
-use crate::{
-    ops::remove::tree::{OwnedOrBorrowedFd, TreeNode},
-    Error,
-};
+use crate::{ops::remove::tree::TreeNode, Error};
 
 /// Removes a directory at this path, after removing all its contents.
 ///
@@ -103,20 +103,18 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
             if is_dir {
                 tasks.push(task::spawn_blocking({
                     let node = TreeNode {
-                        file: OwnedOrBorrowedFd::Owned(
-                            open(
-                                file.as_ref(),
-                                OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                                Mode::empty(),
-                            )
-                            .map_io_err(|| {
-                                format!("Failed to open directory: {:?}", file.as_ref())
-                            })?,
-                        ),
+                        file: open(
+                            file.as_ref(),
+                            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                            Mode::empty(),
+                        )
+                        .map_io_err(|| format!("Failed to open directory: {:?}", file.as_ref()))?,
                         file_name: CString::new(OsString::from(file.into_owned()).into_vec())
                             .unwrap(),
                         parent: Some(Arc::new(TreeNode {
-                            file: OwnedOrBorrowedFd::Borrowed(*AT_FDCWD),
+                            // TODO Dropping this will fail. Rust doesn't do anything in that case,
+                            //  but still, we should avoid dropping the OwnedFd when parent is None.
+                            file: unsafe { OwnedFd::from_raw_fd(AT_FDCWD.as_raw_fd()) },
                             file_name: CString::default(),
                             parent: None,
                             remaining_children: AtomicIsize::new(1),
@@ -173,17 +171,15 @@ fn delete_dir(
                     tasks
                         .send(task::spawn_blocking({
                             let node = TreeNode {
-                                file: OwnedOrBorrowedFd::Owned(
-                                    openat(
-                                        &node.file,
-                                        file.name,
-                                        OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                                        Mode::empty(),
-                                    )
-                                    .map_io_err(|| {
-                                        format!("Failed to open directory: {:?}", node.file_name)
-                                    })?,
-                                ),
+                                file: openat(
+                                    &node.file,
+                                    file.name,
+                                    OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                                    Mode::empty(),
+                                )
+                                .map_io_err(|| {
+                                    format!("Failed to open directory: {:?}", node.file_name)
+                                })?,
                                 file_name: file.name.to_owned(),
                                 parent: Some(node.clone()),
                                 remaining_children: AtomicIsize::new(0),
@@ -251,29 +247,15 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
 mod tree {
     use std::{
         ffi::CString,
-        os::unix::io::{AsFd, BorrowedFd, OwnedFd},
+        os::unix::io::OwnedFd,
         sync::{atomic::AtomicIsize, Arc},
     };
 
     pub struct TreeNode {
-        pub file: OwnedOrBorrowedFd,
+        pub file: OwnedFd,
         pub file_name: CString,
         // TODO manually implement this Arc with our remaining_children atomic
         pub parent: Option<Arc<TreeNode>>,
         pub remaining_children: AtomicIsize,
-    }
-
-    pub enum OwnedOrBorrowedFd {
-        Owned(OwnedFd),
-        Borrowed(BorrowedFd<'static>),
-    }
-
-    impl AsFd for OwnedOrBorrowedFd {
-        fn as_fd(&self) -> BorrowedFd<'_> {
-            match self {
-                Self::Owned(o) => o.as_fd(),
-                Self::Borrowed(b) => b.as_fd(),
-            }
-        }
     }
 }
