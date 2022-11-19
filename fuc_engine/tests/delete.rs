@@ -6,36 +6,36 @@ use tempfile::tempdir;
 
 #[test]
 fn one_file() {
-    let dir = tempdir().unwrap();
-    let file = dir.path().join("file");
+    let root = tempdir().unwrap();
+    let file = root.path().join("file");
     File::create(&file).unwrap();
     assert!(file.exists());
 
     fuc_engine::remove_dir_all(&file).unwrap();
 
     assert!(!file.exists());
-    assert!(dir.as_ref().exists());
+    assert!(root.as_ref().exists());
 }
 
 #[test]
 fn one_dir() {
-    let dir = tempdir().unwrap();
-    let root = dir.path().join("dir");
-    fs::create_dir(&root).unwrap();
-    assert!(root.exists());
+    let root = tempdir().unwrap();
+    let dir = root.path().join("dir");
+    fs::create_dir(&dir).unwrap();
+    assert!(dir.exists());
 
-    fuc_engine::remove_dir_all(&root).unwrap();
+    fuc_engine::remove_dir_all(&dir).unwrap();
 
-    assert!(!root.exists());
-    assert!(dir.as_ref().exists());
+    assert!(!dir.exists());
+    assert!(root.as_ref().exists());
 }
 
 #[rstest]
 fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: usize) {
-    let dir = tempdir().unwrap();
-    let root = dir.path().join("root");
+    let root = tempdir().unwrap();
+    let dir = root.path().join("dir");
     Generator::builder()
-        .root_dir(root.clone())
+        .root_dir(dir.clone())
         .num_files_with_ratio(NumFilesWithRatio::from_num_files(
             NonZeroUsize::new(num_files).unwrap(),
         ))
@@ -43,8 +43,8 @@ fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: usize) {
         .generate(&mut io::sink())
         .unwrap();
 
-    fuc_engine::remove_dir_all(&root).unwrap();
+    fuc_engine::remove_dir_all(&dir).unwrap();
 
-    assert!(!root.exists());
-    assert!(dir.as_ref().exists());
+    assert!(!dir.exists());
+    assert!(root.as_ref().exists());
 }

@@ -3,13 +3,11 @@ use std::{
     cell::UnsafeCell,
     ffi::{CStr, CString, OsString},
     fmt::Debug,
-    fs, io, mem,
+    fs, io,
+    mem::ManuallyDrop,
     num::NonZeroUsize,
-    os::unix::{
-        ffi::OsStringExt,
-        io::{AsRawFd, FromRawFd, OwnedFd},
-    },
-    path::Path,
+    os::unix::ffi::OsStringExt,
+    path::{Path, MAIN_SEPARATOR},
     ptr::NonNull,
     sync::atomic::{AtomicIsize, Ordering},
     thread,
@@ -18,7 +16,7 @@ use std::{
 use nix::{
     dents::RawDir,
     errno::Errno,
-    fcntl::{open, openat, OFlag},
+    fcntl::{open, OFlag},
     file_type::FileType,
     sys::stat::Mode,
     unistd::{unlinkat, UnlinkatFlags},
@@ -28,7 +26,7 @@ use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
 use typed_builder::TypedBuilder;
 
-use crate::{ops::remove::tree::TreeNode, Error};
+use crate::Error;
 
 /// Removes a directory at this path, after removing all its contents.
 ///
@@ -103,25 +101,8 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
             if is_dir {
                 tasks.push(task::spawn_blocking({
                     let node = TreeNode {
-                        file: open(
-                            file.as_ref(),
-                            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                            Mode::empty(),
-                        )
-                        .map_io_err(|| format!("Failed to open directory: {:?}", file.as_ref()))?,
-                        file_name: CString::new(OsString::from(file.into_owned()).into_vec())
-                            .unwrap(),
-                        parent: Some(
-                            Box::leak(Box::new(TreeNode {
-                                // SAFETY: We make sure to not drop this in delete_dir if parent is
-                                // None.
-                                file: unsafe { OwnedFd::from_raw_fd(AT_FDCWD.as_raw_fd()) },
-                                file_name: CString::default(),
-                                parent: None,
-                                remaining_children: AtomicIsize::new(1),
-                            }))
-                            .into(),
-                        ),
+                        path: CString::new(OsString::from(file.into_owned()).into_vec()).unwrap(),
+                        parent: None,
                         remaining_children: AtomicIsize::new(0),
                     };
                     let tx = tx.clone();
@@ -161,13 +142,19 @@ fn delete_dir(
         let mut children = 0;
 
         BUF.with(|buf| {
-            let parent = Some(node.into());
-            for file in RawDir::new(&node.file, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
+            let dir = open(
+                node.path.as_c_str(),
+                OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+                Mode::empty(),
+            )
+            .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
+
+            for file in RawDir::new(&dir, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
                 const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
                 const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
                 let file =
-                    file.map_io_err(|| format!("Failed to read directory: {:?}", node.file_name))?;
+                    file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
                 if file.name == DOT || file.name == DOT_DOT {
                     continue;
                 }
@@ -178,17 +165,18 @@ fn delete_dir(
                     tasks
                         .send(task::spawn_blocking({
                             let node = TreeNode {
-                                file: openat(
-                                    &node.file,
-                                    file.name,
-                                    OFlag::O_RDONLY | OFlag::O_DIRECTORY,
-                                    Mode::empty(),
-                                )
-                                .map_io_err(|| {
-                                    format!("Failed to open directory: {:?}", node.file_name)
-                                })?,
-                                file_name: file.name.to_owned(),
-                                parent,
+                                path: {
+                                    let prefix = node.path.to_bytes();
+                                    let name = file.name.to_bytes_with_nul();
+
+                                    let mut path =
+                                        Vec::with_capacity(prefix.len() + 1 + name.len());
+                                    path.extend_from_slice(prefix);
+                                    path.push(MAIN_SEPARATOR as u8);
+                                    path.extend_from_slice(name);
+                                    unsafe { CString::from_vec_with_nul_unchecked(path) }
+                                },
+                                parent: Some(node.into()),
                                 remaining_children: AtomicIsize::new(0),
                             };
                             let tasks = tasks.clone();
@@ -196,7 +184,7 @@ fn delete_dir(
                         }))
                         .map_err(|_| Error::Internal)?;
                 } else {
-                    unlinkat(&node.file, file.name, UnlinkatFlags::NoRemoveDir)
+                    unlinkat(&dir, file.name, UnlinkatFlags::NoRemoveDir)
                         .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
                 }
             }
@@ -215,44 +203,32 @@ fn delete_dir(
         }
     }
 
-    'done: {
-        unsafe {
-            let mut next = NonNull::from(node);
-            while let Some(parent) = next.as_ref().parent {
-                unlinkat(
-                    &parent.as_ref().file,
-                    next.as_ref().file_name.as_c_str(),
-                    UnlinkatFlags::RemoveDir,
-                )
-                .map_io_err(|| {
-                    format!("Failed to delete directory: {:?}", next.as_ref().file_name)
-                })?;
+    let mut next = Some(NonNull::from(node));
+    while let Some(node) = next {
+        let node = ManuallyDrop::new(unsafe { Box::from_raw(node.as_ptr()) });
 
-                // We must be the last user of this allocation b/c:
-                // - If we came from outside the loop, we would have exited above in the
-                //   children check.
-                // - If we're coming from inside the loop, the remaining_children check operates
-                //   on the parent and would block the next iteration.
-                drop(Box::from_raw(next.as_ptr()));
+        next = node.parent;
+        unlinkat(AT_FDCWD, node.path.as_c_str(), UnlinkatFlags::RemoveDir)
+            .map_io_err(|| format!("Failed to delete directory: {:?}", node.path))?;
 
-                // TODO using Relaxed here is almost certainly wrong. Do some more research and
-                //  figure out the correct ordering.
-                if parent
-                    .as_ref()
-                    .remaining_children
-                    .fetch_sub(1, Ordering::Relaxed)
-                    != 1
-                {
-                    // There are still active children, let the last of them do the cleanup.
-                    break 'done;
-                }
-                next = parent;
+        // We must be the last user of this allocation b/c:
+        // - If we came from outside the loop, we would have exited above in the
+        //   children check.
+        // - If we're coming from inside the loop, the remaining_children check operates
+        //   on the parent and would block the next iteration.
+        ManuallyDrop::into_inner(node);
+
+        if let Some(parent) = next {
+            // TODO using Relaxed here is almost certainly wrong. Do some more research and
+            //  figure out the correct ordering.
+            if unsafe { parent.as_ref() }
+                .remaining_children
+                .fetch_sub(1, Ordering::Relaxed)
+                != 1
+            {
+                // There are still active children, let the last of them do the cleanup.
+                break;
             }
-
-            let root = Box::from_raw(next.as_ptr());
-            // See comment in run_deletion_scheduler, this isn't a real fd so don't drop it.
-            debug_assert_eq!(root.file.as_raw_fd(), AT_FDCWD.as_raw_fd());
-            mem::forget(root.file);
         }
     }
 
@@ -278,16 +254,10 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
     }
 }
 
-mod tree {
-    use std::{ffi::CString, os::unix::io::OwnedFd, ptr::NonNull, sync::atomic::AtomicIsize};
-
-    pub struct TreeNode {
-        // TODO get rid of this or we can run out of file descriptors
-        pub file: OwnedFd,
-        pub file_name: CString,
-        pub parent: Option<NonNull<TreeNode>>,
-        pub remaining_children: AtomicIsize,
-    }
-
-    unsafe impl Send for TreeNode {}
+struct TreeNode {
+    path: CString,
+    parent: Option<NonNull<TreeNode>>,
+    remaining_children: AtomicIsize,
 }
+
+unsafe impl Send for TreeNode {}
