@@ -81,9 +81,11 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
 async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
     op: RemoveOp<'a, F>,
 ) -> Result<(), Error> {
+    // TODO use futex in lockness mpsc::latest()
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     {
+        // TODO size hint
         let mut tasks = Vec::new();
         for file in op.files {
             if op.preserve_root && file == Path::new("/") {
@@ -171,6 +173,7 @@ fn delete_dir(
                 }
 
                 if file.file_type == FileType::Directory {
+                    // TODO fix the error handling with respect to children not getting updated
                     children += 1;
                     tasks
                         .send(task::spawn_blocking({
@@ -279,6 +282,7 @@ mod tree {
     use std::{ffi::CString, os::unix::io::OwnedFd, ptr::NonNull, sync::atomic::AtomicIsize};
 
     pub struct TreeNode {
+        // TODO get rid of this or we can run out of file descriptors
         pub file: OwnedFd,
         pub file_name: CString,
         pub parent: Option<NonNull<TreeNode>>,

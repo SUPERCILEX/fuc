@@ -155,7 +155,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("fs::remove_dir_all", num_files),
+        BenchmarkId::new("rayon_fs::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -165,7 +165,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    fs::remove_dir_all(dir.path()).unwrap();
+                    rayon_fs::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },
@@ -193,7 +193,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("rayon_fs::remove_dir_all", num_files),
+        BenchmarkId::new("fs::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -203,7 +203,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    rayon_fs::remove_dir_all(dir.path()).unwrap();
+                    fs::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },
