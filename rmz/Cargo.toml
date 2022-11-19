@@ -20,11 +20,11 @@ thiserror = "1.0.37"
 criterion = "0.4.0"
 expect-test = "1.4.0"
 ftzz = "1.1.3"
-futures = "0.3.25"
-rayon = "1.5.3"
 tempfile = "3.3.0"
-tokio = { version = "1.21.2", features = ["rt"] }
 trycmd = "0.14.4"
+rayon_rm = { path = "../comparisons/rayon_rm" }
+og_crappy_rm = { path = "../comparisons/og_crappy_rm" }
+stdlib_rm = { path = "../comparisons/stdlib_rm" }
 
 [[bench]]
 name = "rmz"

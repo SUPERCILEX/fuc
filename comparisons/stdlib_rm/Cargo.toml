@@ -1,0 +1,5 @@
+[package]
+name = "stdlib_rm"
+version = "0.0.0"
+edition.workspace = true
+publish = false

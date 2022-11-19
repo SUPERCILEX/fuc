@@ -815,6 +815,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "og_crappy_rm"
+version = "0.0.0"
+dependencies = [
+ "futures",
+ "tokio",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1041,6 +1049,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rayon_rm"
+version = "0.0.0"
+dependencies = [
+ "rayon",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1084,11 +1099,11 @@ dependencies = [
  "expect-test",
  "ftzz",
  "fuc_engine",
- "futures",
- "rayon",
+ "og_crappy_rm",
+ "rayon_rm",
+ "stdlib_rm",
  "tempfile",
  "thiserror",
- "tokio",
  "trycmd",
 ]
 
@@ -1284,6 +1299,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "485e65c1203eb37244465e857d15a26d3a85a5410648ccb53b18bd44cb3a7336"
 
 [[package]]
+name = "stdlib_rm"
+version = "0.0.0"
+
+[[package]]
 name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1393,9 +1412,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.21.2"
+version = "1.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9e03c497dc955702ba729190dc4aac6f2a0ce97f913e5b1b5912fc5039d9099"
+checksum = "d76ce4a75fb488c605c54bf610f221cea8b0dafb53333c1a67e8ee199dcd2ae3"
 dependencies = [
  "autocfg",
  "pin-project-lite",

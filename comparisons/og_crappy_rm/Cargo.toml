@@ -1,0 +1,9 @@
+[package]
+name = "og_crappy_rm"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+futures = "0.3.25"
+tokio = { version = "1.21.2", features = ["rt"] }
