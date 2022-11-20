@@ -137,11 +137,12 @@ fn empty_files(c: &mut Criterion) {
         let files = NormalTempFile::create(0, false);
         let path = files.to.as_path();
         b.iter(|| {
+            use std::os::fd::FromRawFd;
+
             use nix::{
                 fcntl::{open, OFlag},
                 sys::stat::Mode,
             };
-            use std::os::fd::FromRawFd;
 
             let fd = open(path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
             unsafe {
@@ -156,11 +157,12 @@ fn empty_files(c: &mut Criterion) {
         let dir = File::open(files.dir.path()).unwrap();
         let path = files.to.file_name().unwrap();
         b.iter(|| {
+            use std::os::fd::FromRawFd;
+
             use nix::{
                 fcntl::{openat, OFlag},
                 sys::stat::Mode,
             };
-            use std::os::fd::FromRawFd;
 
             let fd = openat(dir.as_raw_fd(), path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
             unsafe {
@@ -533,8 +535,9 @@ fn open_standard(path: &Path, direct_io: bool) -> File {
 
     #[cfg(target_os = "linux")]
     if direct_io {
-        use nix::libc::O_DIRECT;
         use std::os::unix::fs::OpenOptionsExt;
+
+        use nix::libc::O_DIRECT;
         options.custom_flags(O_DIRECT);
     }
 
