@@ -3,7 +3,6 @@ use std::{
     alloc::Layout,
     fs::{copy, File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
-    os::unix::{fs::FileExt, io::AsRawFd},
     path::{Path, PathBuf},
     thread,
     time::Duration,
@@ -98,8 +97,16 @@ fn empty_files(c: &mut Criterion) {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
-                use nix::sys::stat::{mknod, Mode, SFlag};
-                mknod(files.to.as_path(), SFlag::S_IFREG, Mode::empty(), 0).unwrap();
+                use rustix::fs::{cwd, mknodat, FileType, Mode};
+
+                mknodat(
+                    cwd(),
+                    files.to.as_path(),
+                    FileType::RegularFile,
+                    Mode::empty(),
+                    0,
+                )
+                .unwrap();
 
                 files.dir
             },
@@ -116,11 +123,12 @@ fn empty_files(c: &mut Criterion) {
                 (files, dir)
             },
             |(files, dir)| {
-                use nix::sys::stat::{mknodat, Mode, SFlag};
+                use rustix::fs::{mknodat, FileType, Mode};
+
                 mknodat(
-                    dir.as_raw_fd(),
+                    &dir,
                     files.to.file_name().unwrap(),
-                    SFlag::S_IFREG,
+                    FileType::RegularFile,
                     Mode::empty(),
                     0,
                 )
@@ -137,17 +145,9 @@ fn empty_files(c: &mut Criterion) {
         let files = NormalTempFile::create(0, false);
         let path = files.to.as_path();
         b.iter(|| {
-            use std::os::fd::FromRawFd;
+            use rustix::fs::{cwd, openat, Mode, OFlags};
 
-            use nix::{
-                fcntl::{open, OFlag},
-                sys::stat::Mode,
-            };
-
-            let fd = open(path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
-            unsafe {
-                File::from_raw_fd(fd);
-            }
+            openat(cwd(), path, OFlags::CREATE, Mode::RWXU).unwrap()
         });
     });
 
@@ -157,17 +157,9 @@ fn empty_files(c: &mut Criterion) {
         let dir = File::open(files.dir.path()).unwrap();
         let path = files.to.file_name().unwrap();
         b.iter(|| {
-            use std::os::fd::FromRawFd;
+            use rustix::fs::{openat, Mode, OFlags};
 
-            use nix::{
-                fcntl::{openat, OFlag},
-                sys::stat::Mode,
-            };
-
-            let fd = openat(dir.as_raw_fd(), path, OFlag::O_CREAT, Mode::S_IRWXU).unwrap();
-            unsafe {
-                File::from_raw_fd(fd);
-            }
+            openat(&dir, path, OFlags::CREATE, Mode::RWXU).unwrap()
         });
     });
 }
@@ -251,7 +243,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
         BenchmarkId::new("copy_file_range", num_bytes),
         &num_bytes,
         |b, num_bytes| {
-            use nix::fcntl::copy_file_range;
+            use rustix::fs::copy_file_range;
 
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes, direct_io),
@@ -265,16 +257,10 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .unwrap();
                     to.set_len(*num_bytes).unwrap();
 
-                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
+                    let mut bytes_remaining = *num_bytes;
                     while bytes_remaining > 0 {
-                        bytes_remaining -= copy_file_range(
-                            from.as_raw_fd(),
-                            None,
-                            to.as_raw_fd(),
-                            None,
-                            bytes_remaining,
-                        )
-                        .unwrap();
+                        bytes_remaining -=
+                            copy_file_range(&from, None, &to, None, bytes_remaining).unwrap();
                     }
 
                     files.dir
@@ -340,6 +326,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
         },
     );
 
+    #[cfg(unix)]
     group.bench_with_input(
         BenchmarkId::new("buffered_parallel", num_bytes),
         &num_bytes,
@@ -347,6 +334,8 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes, direct_io),
                 |files| {
+                    use std::os::unix::fs::FileExt;
+
                     let threads =
                         u64::try_from(thread::available_parallelism().unwrap().get()).unwrap();
                     let chunk_size = num_bytes / threads;
@@ -500,7 +489,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
         BenchmarkId::new("sendfile", num_bytes),
         &num_bytes,
         |b, num_bytes| {
-            use nix::sys::sendfile::sendfile64;
+            use rustix::fs::sendfile;
 
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes, direct_io),
@@ -516,9 +505,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
 
                     let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
                     while bytes_remaining > 0 {
-                        bytes_remaining -=
-                            sendfile64(to.as_raw_fd(), from.as_raw_fd(), None, bytes_remaining)
-                                .unwrap();
+                        bytes_remaining -= sendfile(&to, &from, None, bytes_remaining).unwrap();
                     }
 
                     files.dir
@@ -536,9 +523,7 @@ fn open_standard(path: &Path, direct_io: bool) -> File {
     #[cfg(target_os = "linux")]
     if direct_io {
         use std::os::unix::fs::OpenOptionsExt;
-
-        use nix::libc::O_DIRECT;
-        options.custom_flags(O_DIRECT);
+        options.custom_flags(nix::libc::O_DIRECT);
     }
 
     let file = options.open(path).unwrap();
@@ -577,17 +562,8 @@ fn write_from_buffer(to: PathBuf, mut reader: BufReader<File>) {
 
 #[cfg(target_os = "linux")]
 fn allocate(file: &File, len: u64) {
-    use nix::{
-        fcntl::{fallocate, FallocateFlags},
-        libc::off_t,
-    };
-    fallocate(
-        file.as_raw_fd(),
-        FallocateFlags::empty(),
-        0,
-        off_t::try_from(len).unwrap(),
-    )
-    .unwrap();
+    use rustix::fs::{fallocate, FallocateFlags};
+    fallocate(file, FallocateFlags::empty(), 0, len).unwrap();
 }
 
 fn create_random_buffer(bytes: usize, direct_io: bool) -> Vec<u8> {
