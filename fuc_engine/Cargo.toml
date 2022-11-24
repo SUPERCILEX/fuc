@@ -15,7 +15,7 @@ tokio = { version = "1.21.2", features = ["rt", "sync"] }
 typed-builder = "0.11.0"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.25.0", default-features = false, features = ["fs", "dents"], git = "https://github.com/SUPERCILEX/nix" }
+rustix = { version = "0.36.3", features = ["fs"], git = "https://github.com/bytecodealliance/rustix" }
 
 [dev-dependencies]
 expect-test = "1.4.0"

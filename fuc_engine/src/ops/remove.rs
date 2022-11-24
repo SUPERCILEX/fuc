@@ -11,14 +11,9 @@ use std::{
     thread,
 };
 
-use nix::{
-    dents::RawDir,
-    errno::Errno,
-    fcntl::{open, OFlag},
-    file_type::FileType,
-    sys::stat::Mode,
-    unistd::{unlinkat, UnlinkatFlags},
-    AT_FDCWD,
+use rustix::{
+    fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
+    io::Errno,
 };
 use sync::mpsc;
 use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
@@ -135,9 +130,10 @@ fn delete_dir(
     let node = Arc::new(node);
 
     BUF.with(|buf| {
-        let dir = open(
+        let dir = openat(
+            cwd(),
             node.path.as_c_str(),
-            OFlag::O_RDONLY | OFlag::O_DIRECTORY,
+            OFlags::RDONLY | OFlags::DIRECTORY,
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
@@ -147,17 +143,17 @@ fn delete_dir(
             const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
             let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
-            if file.name == DOT || file.name == DOT_DOT {
+            if file.file_name() == DOT || file.file_name() == DOT_DOT {
                 continue;
             }
 
-            if file.file_type == FileType::Directory {
+            if file.file_type() == FileType::Directory {
                 tasks
                     .send(task::spawn_blocking({
                         let node = TreeNode {
                             path: {
                                 let prefix = node.path.to_bytes();
-                                let name = file.name.to_bytes_with_nul();
+                                let name = file.file_name().to_bytes_with_nul();
 
                                 let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
                                 path.extend_from_slice(prefix);
@@ -172,7 +168,7 @@ fn delete_dir(
                     }))
                     .map_err(|_| Error::Internal)?;
             } else {
-                unlinkat(&dir, file.name, UnlinkatFlags::NoRemoveDir)
+                unlinkat(&dir, file.file_name(), AtFlags::empty())
                     .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
             }
         }
@@ -209,7 +205,7 @@ struct TreeNode {
 impl Drop for TreeNode {
     fn drop(&mut self) {
         // TODO Send this error over lockness
-        unlinkat(AT_FDCWD, self.path.as_c_str(), UnlinkatFlags::RemoveDir)
+        unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
             .map_io_err(|| format!("Failed to delete directory: {:?}", self.path))
             .unwrap();
     }
