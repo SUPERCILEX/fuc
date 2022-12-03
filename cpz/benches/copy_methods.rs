@@ -569,8 +569,7 @@ fn allocate(file: &File, len: u64) {
 fn create_random_buffer(bytes: usize, direct_io: bool) -> Vec<u8> {
     assert!(
         !direct_io || bytes % (1 << 12) == 0,
-        "Num bytes ({}) must be divisible by 2^12",
-        bytes
+        "Num bytes ({bytes}) must be divisible by 2^12",
     );
 
     let mut buf = if direct_io {

@@ -1,4 +1,4 @@
-use std::{fs::File, io, num::NonZeroUsize, path::Path, time::Duration};
+use std::{fmt, fs::File, num::NonZeroU64, path::Path, time::Duration};
 
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BenchmarkGroup, BenchmarkId,
@@ -7,15 +7,24 @@ use criterion::{
 use ftzz::generator::{Generator, NumFilesWithRatio};
 use tempfile::tempdir;
 
+// TODO https://github.com/rust-lang/rust/pull/104389
+struct Sink;
+
+impl fmt::Write for Sink {
+    fn write_str(&mut self, _: &str) -> fmt::Result {
+        Ok(())
+    }
+}
+
 fn uniform(c: &mut Criterion) {
     fn gen_files(dir: &Path, num_files: u64) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
             .num_files_with_ratio(NumFilesWithRatio::from_num_files(
-                NonZeroUsize::new(usize::try_from(num_files).unwrap()).unwrap(),
+                NonZeroU64::new(num_files).unwrap(),
             ))
             .build()
-            .generate(&mut io::sink())
+            .generate(&mut Sink)
             .unwrap();
     }
 
@@ -36,13 +45,13 @@ fn dir_heavy(c: &mut Criterion) {
             .root_dir(dir.to_path_buf())
             .num_files_with_ratio(
                 NumFilesWithRatio::new(
-                    NonZeroUsize::new(usize::try_from(num_files).unwrap()).unwrap(),
-                    NonZeroUsize::new(1).unwrap(),
+                    NonZeroU64::new(num_files).unwrap(),
+                    NonZeroU64::new(1).unwrap(),
                 )
                 .unwrap(),
             )
             .build()
-            .generate(&mut io::sink())
+            .generate(&mut Sink)
             .unwrap();
     }
 
@@ -62,11 +71,11 @@ fn file_heavy(c: &mut Criterion) {
         Generator::builder()
             .root_dir(dir.to_path_buf())
             .num_files_with_ratio({
-                let num_files = NonZeroUsize::new(usize::try_from(num_files).unwrap()).unwrap();
+                let num_files = NonZeroU64::new(num_files).unwrap();
                 NumFilesWithRatio::new(num_files, num_files).unwrap()
             })
             .build()
-            .generate(&mut io::sink())
+            .generate(&mut Sink)
             .unwrap();
     }
 
@@ -108,14 +117,14 @@ fn deep_dirs(c: &mut Criterion) {
             .root_dir(dir.to_path_buf())
             .num_files_with_ratio(
                 NumFilesWithRatio::new(
-                    NonZeroUsize::new(usize::try_from(num_files).unwrap()).unwrap(),
-                    NonZeroUsize::new(10).unwrap(),
+                    NonZeroU64::new(num_files).unwrap(),
+                    NonZeroU64::new(10).unwrap(),
                 )
                 .unwrap(),
             )
             .max_depth(100)
             .build()
-            .generate(&mut io::sink())
+            .generate(&mut Sink)
             .unwrap();
     }
 

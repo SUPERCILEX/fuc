@@ -10,8 +10,8 @@ categories = ["filesystem"]
 license.workspace = true
 
 [dependencies]
-thiserror = "1.0.37"
-tokio = { version = "1.21.2", features = ["rt", "sync"] }
+thiserror = "1.0.38"
+tokio = { version = "1.23.0", features = ["rt", "sync"] }
 typed-builder = "0.11.0"
 
 [target.'cfg(unix)'.dependencies]
@@ -19,8 +19,8 @@ rustix = { version = "0.36.3", features = ["fs"], git = "https://github.com/byte
 
 [dev-dependencies]
 expect-test = "1.4.0"
-ftzz = "1.1.3"
-public-api = "0.22.0"
-rstest = "0.15.0"
-rustdoc-json = "0.6.0"
+ftzz = "1.1.4"
+public-api = "0.24.2"
+rstest = "0.16.0"
+rustdoc-json = "0.7.3"
 tempfile = "3.3.0"

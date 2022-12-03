@@ -1,5 +1,3 @@
-use std::fmt::Write;
-
 use expect_test::expect_file;
 use public_api::PublicApi;
 
@@ -11,12 +9,9 @@ fn api() {
         .build()
         .unwrap();
 
-    let mut golden = String::new();
-    {
-        let api = PublicApi::from_rustdoc_json(json_path, public_api::Options::default()).unwrap();
-        for public_item in api.items() {
-            writeln!(golden, "{public_item}").unwrap();
-        }
-    }
-    expect_file!["../api.golden"].assert_eq(&golden);
+    let api = PublicApi::from_rustdoc_json(json_path, public_api::Options::default())
+        .unwrap()
+        .to_string();
+
+    expect_file!["../api.golden"].assert_eq(&api);
 }

@@ -138,7 +138,8 @@ fn delete_dir(
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
 
-        for file in RawDir::new(&dir, unsafe { &mut *buf.get() }.spare_capacity_mut()) {
+        let mut raw_dir = RawDir::new(&dir, unsafe { &mut *buf.get() }.spare_capacity_mut());
+        while let Some(file) = raw_dir.next() {
             const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
             const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 

@@ -1,8 +1,17 @@
-use std::{fs, fs::File, io, num::NonZeroUsize};
+use std::{fmt, fs, fs::File, num::NonZeroU64};
 
 use ftzz::generator::{Generator, NumFilesWithRatio};
 use rstest::rstest;
 use tempfile::tempdir;
+
+// TODO https://github.com/rust-lang/rust/pull/104389
+struct Sink;
+
+impl fmt::Write for Sink {
+    fn write_str(&mut self, _: &str) -> fmt::Result {
+        Ok(())
+    }
+}
 
 #[test]
 fn one_file() {
@@ -31,16 +40,16 @@ fn one_dir() {
 }
 
 #[rstest]
-fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: usize) {
+fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: u64) {
     let root = tempdir().unwrap();
     let dir = root.path().join("dir");
     Generator::builder()
         .root_dir(dir.clone())
         .num_files_with_ratio(NumFilesWithRatio::from_num_files(
-            NonZeroUsize::new(num_files).unwrap(),
+            NonZeroU64::new(num_files).unwrap(),
         ))
         .build()
-        .generate(&mut io::sink())
+        .generate(&mut Sink)
         .unwrap();
 
     fuc_engine::remove_dir_all(&dir).unwrap();

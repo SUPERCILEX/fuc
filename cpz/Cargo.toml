@@ -13,9 +13,9 @@ license.workspace = true
 cache-size = "0.6.0"
 criterion = "0.4.0"
 memmap2 = "0.5.8"
-nix = "0.25.0"
+nix = "0.26.1"
 rand = "0.8.5"
-rustix = { version = "0.36.2", features = ["fs"] }
+rustix = { version = "0.36.5", features = ["fs"] }
 tempfile = "3.3.0"
 
 [[bench]]
