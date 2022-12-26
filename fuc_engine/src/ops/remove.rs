@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    cell::{LazyCell, UnsafeCell},
+    cell::{LazyCell, RefCell},
     ffi::{CStr, CString, OsString},
     fmt::Debug,
     fs, io,
@@ -153,7 +153,7 @@ fn delete_dir(node: TreeNode) {
 
 fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
     thread_local! {
-        static BUF: UnsafeCell<Vec<u8>> = UnsafeCell::new(Vec::with_capacity(8192));
+        static BUF: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(8192));
     }
 
     BUF.with(|buf| {
@@ -166,7 +166,8 @@ fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
 
         let node = LazyCell::new(|| Arc::new(node));
-        let mut raw_dir = RawDir::new(&dir, unsafe { &mut *buf.get() }.spare_capacity_mut());
+        let mut buf = buf.borrow_mut();
+        let mut raw_dir = RawDir::new(&dir, buf.spare_capacity_mut());
         while let Some(file) = raw_dir.next() {
             const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
             const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
