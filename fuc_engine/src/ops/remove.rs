@@ -181,7 +181,7 @@ fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
                 task::spawn_blocking({
                     let node = TreeNode {
                         path: {
-                            let prefix = node.path.to_bytes();
+                            let prefix = node.path.as_bytes();
                             let name = file.file_name().to_bytes_with_nul();
 
                             let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
