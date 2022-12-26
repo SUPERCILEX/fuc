@@ -20,7 +20,7 @@ fn one_file() {
     File::create(&file).unwrap();
     assert!(file.exists());
 
-    fuc_engine::remove_dir_all(&file).unwrap();
+    fuc_engine::remove_file(&file).unwrap();
 
     assert!(!file.exists());
     assert!(root.as_ref().exists());
@@ -33,7 +33,7 @@ fn one_dir() {
     fs::create_dir(&dir).unwrap();
     assert!(dir.exists());
 
-    fuc_engine::remove_dir_all(&dir).unwrap();
+    fuc_engine::remove_file(&dir).unwrap();
 
     assert!(!dir.exists());
     assert!(root.as_ref().exists());
@@ -52,7 +52,7 @@ fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: u64) {
         .generate(&mut Sink)
         .unwrap();
 
-    fuc_engine::remove_dir_all(&dir).unwrap();
+    fuc_engine::remove_file(&dir).unwrap();
 
     assert!(!dir.exists());
     assert!(root.as_ref().exists());

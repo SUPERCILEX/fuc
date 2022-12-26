@@ -157,7 +157,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    fuc_engine::remove_dir_all(dir.path()).unwrap();
+                    fuc_engine::remove_file(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },

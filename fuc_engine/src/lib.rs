@@ -8,7 +8,7 @@ use std::io;
 
 use thiserror::Error;
 
-pub use crate::ops::{remove_dir_all, RemoveOp};
+pub use crate::ops::{remove_file, remove_file as remove_dir_all, RemoveOp};
 
 mod ops;
 

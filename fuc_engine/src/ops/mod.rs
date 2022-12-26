@@ -1,3 +1,3 @@
-pub use remove::{remove_dir_all, RemoveOp};
+pub use remove::{remove_file, RemoveOp};
 
 mod remove;
