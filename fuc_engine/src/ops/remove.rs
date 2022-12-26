@@ -58,41 +58,53 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
             (tx, thread::spawn(|| root_worker_thread(rx)))
         });
 
-        for file in self.files {
-            if self.preserve_root && file == Path::new("/") {
-                return Err(Error::PreserveRoot);
-            }
-            let is_dir = match file.metadata() {
-                Err(e) if self.force && e.kind() == io::ErrorKind::NotFound => {
-                    continue;
-                }
-                r => r,
-            }
-            .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
-            .is_dir();
-
-            if is_dir {
-                let (tasks, _) = &*scheduling;
-                drop(
-                    tasks.send(Message::Node(TreeNode {
-                        path: CString::new(OsString::from(file.into_owned()).into_vec())
-                            .map_err(|_| Error::BadPath)?,
-                        _parent: None,
-                        messages: tasks.clone(),
-                    })),
-                );
-            } else {
-                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
-            }
-        }
+        let result = schedule_deletions(self, &scheduling);
 
         if let Some((tasks, thread)) = scheduling.into_inner() {
             drop(tasks);
             thread.join().map_err(|_| Error::Join)??;
         }
 
-        Ok(())
+        result
     }
+}
+
+fn schedule_deletions<'a, L>(
+    RemoveOp {
+        files,
+        force,
+        preserve_root,
+    }: RemoveOp<'a, impl IntoIterator<Item = Cow<'a, Path>>>,
+    scheduling: &LazyCell<(Sender<Message>, L), impl FnOnce() -> (Sender<Message>, L)>,
+) -> Result<(), Error> {
+    for file in files {
+        if preserve_root && file == Path::new("/") {
+            return Err(Error::PreserveRoot);
+        }
+        let is_dir = match file.metadata() {
+            Err(e) if force && e.kind() == io::ErrorKind::NotFound => {
+                continue;
+            }
+            r => r,
+        }
+        .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
+        .is_dir();
+
+        if is_dir {
+            let (tasks, _) = &**scheduling;
+            drop(
+                tasks.send(Message::Node(TreeNode {
+                    path: CString::new(OsString::from(file.into_owned()).into_vec())
+                        .map_err(|_| Error::BadPath)?,
+                    _parent: None,
+                    messages: tasks.clone(),
+                })),
+            );
+        } else {
+            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+        }
+    }
+    Ok(())
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -172,7 +184,7 @@ fn delete_dir(node: TreeNode) -> Result<(), Error> {
 
                             let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
                             path.extend_from_slice(prefix);
-                            path.push(MAIN_SEPARATOR as u8);
+                            path.push(u8::try_from(MAIN_SEPARATOR).unwrap());
                             path.extend_from_slice(name);
                             unsafe { CString::from_vec_with_nul_unchecked(path) }
                         },
