@@ -2,6 +2,7 @@
 #![feature(const_result_drop)]
 #![feature(const_option)]
 #![feature(inline_const)]
+#![feature(once_cell)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::io;

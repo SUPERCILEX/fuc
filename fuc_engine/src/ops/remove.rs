@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    cell::UnsafeCell,
+    cell::{LazyCell, UnsafeCell},
     ffi::{CStr, CString, OsString},
     fmt::Debug,
     fs, io,
@@ -126,9 +126,6 @@ fn delete_dir(
         static BUF: UnsafeCell<Vec<u8>> = UnsafeCell::new(Vec::with_capacity(8192));
     }
 
-    // TODO don't always allocate this.
-    let node = Arc::new(node);
-
     BUF.with(|buf| {
         let dir = openat(
             cwd(),
@@ -138,6 +135,7 @@ fn delete_dir(
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
 
+        let node = LazyCell::new(|| Arc::new(node));
         let mut raw_dir = RawDir::new(&dir, unsafe { &mut *buf.get() }.spare_capacity_mut());
         while let Some(file) = raw_dir.next() {
             const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
