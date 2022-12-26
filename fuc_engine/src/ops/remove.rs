@@ -11,12 +11,12 @@ use std::{
     thread,
 };
 
+use lockness::RawOneLatest;
 use rustix::{
     fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
     io::Errno,
 };
-use sync::mpsc;
-use tokio::{sync, sync::mpsc::UnboundedSender, task, task::JoinHandle};
+use tokio::task;
 use typed_builder::TypedBuilder;
 
 use crate::Error;
@@ -54,36 +54,10 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        // TODO see if we should instead wait until we've seen a directory to boot up
-        //  the runtime
-        let parallelism =
-            thread::available_parallelism().unwrap_or(const { NonZeroUsize::new(1).unwrap() });
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .max_blocking_threads(parallelism.get())
-            .build()
-            .map_err(Error::RuntimeCreation)?;
-
-        runtime.block_on(run_deletion_scheduler(self))
-    }
-}
-
-// TODO add tracing to each method
-// TODO add debug logging for each fs op
-async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
-    op: RemoveOp<'a, F>,
-) -> Result<(), Error> {
-    // TODO use futex in lockness mpsc::latest()
-    let (tx, mut rx) = mpsc::unbounded_channel();
-
-    {
-        // TODO size hint
-        let mut tasks = Vec::new();
-        for file in op.files {
-            if op.preserve_root && file == Path::new("/") {
-                return Err(Error::PreserveRoot);
-            }
+        let mut files = self.files.into_iter();
+        for file in &mut files {
             let is_dir = match file.metadata() {
-                Err(e) if op.force && e.kind() == io::ErrorKind::NotFound => {
+                Err(e) if self.force && e.kind() == io::ErrorKind::NotFound => {
                     continue;
                 }
                 r => r,
@@ -92,36 +66,92 @@ async fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
             .is_dir();
 
             if is_dir {
-                tasks.push(task::spawn_blocking({
-                    let node = TreeNode {
-                        path: CString::new(OsString::from(file.into_owned()).into_vec()).unwrap(),
-                        parent: None,
-                    };
-                    let tx = tx.clone();
-                    move || delete_dir(node, &tx)
-                }));
-            } else {
-                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+                let parallelism = thread::available_parallelism()
+                    .unwrap_or(const { NonZeroUsize::new(1).unwrap() });
+                let runtime = tokio::runtime::Builder::new_current_thread()
+                    .max_blocking_threads(parallelism.get())
+                    .build()
+                    .map_err(Error::RuntimeCreation)?;
+
+                return runtime.block_on(async {
+                    run_deletion_scheduler(
+                        file,
+                        RemoveOp {
+                            files,
+                            force: self.force,
+                            preserve_root: self.preserve_root,
+                        },
+                    )
+                });
             }
-        }
-        drop(tx);
 
-        for task in tasks {
-            task.await.map_err(Error::TaskJoin)??;
+            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+        }
+        Ok(())
+    }
+}
+
+// TODO add tracing to each method
+// TODO add debug logging for each fs op
+fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
+    pending_dir: Cow<'a, Path>,
+    RemoveOp {
+        files,
+        force,
+        preserve_root,
+    }: RemoveOp<'a, F>,
+) -> Result<(), Error> {
+    let error_queue = Arc::new(RawOneLatest::default());
+    let mut dirs = 0;
+
+    let mut spawn_dir_deletion = |file: Cow<Path>| {
+        dirs += 1;
+
+        let node = TreeNode {
+            path: CString::new(OsString::from(file.into_owned()).into_vec()).unwrap(),
+            parent: None,
+            error_queue: error_queue.clone(),
+        };
+        task::spawn_blocking(move || delete_dir(node))
+    };
+
+    spawn_dir_deletion(pending_dir);
+
+    for file in files {
+        if preserve_root && file == Path::new("/") {
+            return Err(Error::PreserveRoot);
+        }
+        let is_dir = match file.metadata() {
+            Err(e) if force && e.kind() == io::ErrorKind::NotFound => {
+                continue;
+            }
+            r => r,
+        }
+        .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
+        .is_dir();
+
+        if is_dir {
+            spawn_dir_deletion(file);
+        } else {
+            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
         }
     }
 
-    while let Some(task) = rx.recv().await {
-        task.await.map_err(Error::TaskJoin)??;
+    while dirs > 0 {
+        error_queue.pop()?;
+        dirs -= 1;
     }
-
     Ok(())
 }
 
-fn delete_dir(
-    node: TreeNode,
-    tasks: &UnboundedSender<JoinHandle<Result<(), Error>>>,
-) -> Result<(), Error> {
+fn delete_dir(node: TreeNode) {
+    let error_queue = node.error_queue.clone();
+    if let e @ Err(_) = delete_dir_internal(node) {
+        error_queue.push(e);
+    }
+}
+
+fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
     thread_local! {
         static BUF: UnsafeCell<Vec<u8>> = UnsafeCell::new(Vec::with_capacity(8192));
     }
@@ -147,33 +177,30 @@ fn delete_dir(
             }
 
             if file.file_type() == FileType::Directory {
-                tasks
-                    .send(task::spawn_blocking({
-                        let node = TreeNode {
-                            path: {
-                                let prefix = node.path.to_bytes();
-                                let name = file.file_name().to_bytes_with_nul();
+                task::spawn_blocking({
+                    let node = TreeNode {
+                        path: {
+                            let prefix = node.path.to_bytes();
+                            let name = file.file_name().to_bytes_with_nul();
 
-                                let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
-                                path.extend_from_slice(prefix);
-                                path.push(MAIN_SEPARATOR as u8);
-                                path.extend_from_slice(name);
-                                unsafe { CString::from_vec_with_nul_unchecked(path) }
-                            },
-                            parent: Some(node.clone()),
-                        };
-                        let tasks = tasks.clone();
-                        move || delete_dir(node, &tasks)
-                    }))
-                    .map_err(|_| Error::Internal)?;
+                            let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
+                            path.extend_from_slice(prefix);
+                            path.push(MAIN_SEPARATOR as u8);
+                            path.extend_from_slice(name);
+                            unsafe { CString::from_vec_with_nul_unchecked(path) }
+                        },
+                        parent: Some(node.clone()),
+                        error_queue: node.error_queue.clone(),
+                    };
+                    move || delete_dir(node)
+                });
             } else {
                 unlinkat(&dir, file.file_name(), AtFlags::empty())
                     .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
             }
         }
         Ok(())
-    })?;
-    Ok(())
+    })
 }
 
 trait IoErr<Out> {
@@ -197,15 +224,18 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
 
 struct TreeNode {
     path: CString,
-    // TODO use this to send the done signal when None
     parent: Option<Arc<TreeNode>>,
+    error_queue: Arc<RawOneLatest<Result<(), Error>>>,
 }
 
 impl Drop for TreeNode {
     fn drop(&mut self) {
-        // TODO Send this error over lockness
-        unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
+        if let e @ Err(_) = unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
             .map_io_err(|| format!("Failed to delete directory: {:?}", self.path))
-            .unwrap();
+        {
+            self.error_queue.push(e);
+        } else if self.parent.is_none() {
+            self.error_queue.push(Ok(()));
+        }
     }
 }

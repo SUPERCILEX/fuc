@@ -466,6 +466,7 @@ version = "0.1.0"
 dependencies = [
  "expect-test",
  "ftzz",
+ "lockness",
  "public-api",
  "rstest",
  "rustdoc-json",
@@ -746,6 +747,12 @@ name = "linux-raw-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
+
+[[package]]
+name = "lockness"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11a2d81cbd5c09df3077e0b1a9b12cb3abc8728ac02136f0d65244a61083e32a"
 
 [[package]]
 name = "log"
