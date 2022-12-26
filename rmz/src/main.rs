@@ -52,12 +52,12 @@ fn main() -> Result<(), CliError> {
         .map_err(|e| {
             let wrapper = CliError::Wrapper(format!("{e}"));
             match e {
-                Error::RuntimeCreation(e) => Report::from(e).change_context(wrapper),
                 Error::Io { error, context } => Report::from(error)
                     .attach_printable(context)
                     .change_context(wrapper),
-                Error::TaskJoin(e) => Report::from(e).change_context(wrapper),
-                Error::PreserveRoot | Error::Internal => Report::from(wrapper),
+                Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
+                    Report::from(wrapper)
+                }
             }
         })
 }

@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    cell::{LazyCell, RefCell},
+    cell::RefCell,
     ffi::{CStr, CString, OsString},
     fmt::Debug,
     fs, io,
@@ -11,12 +11,11 @@ use std::{
     thread,
 };
 
-use lockness::RawOneLatest;
+use crossbeam_channel::{Receiver, Sender};
 use rustix::{
     fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
     io::Errno,
 };
-use tokio::task;
 use typed_builder::TypedBuilder;
 
 use crate::Error;
@@ -54,8 +53,15 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let mut files = self.files.into_iter();
-        for file in &mut files {
+        let scheduling = LazyCell::new(|| {
+            let (tx, rx) = crossbeam_channel::unbounded();
+            (tx, thread::spawn(|| root_worker_thread(rx)))
+        });
+
+        for file in self.files {
+            if self.preserve_root && file == Path::new("/") {
+                return Err(Error::PreserveRoot);
+            }
             let is_dir = match file.metadata() {
                 Err(e) if self.force && e.kind() == io::ErrorKind::NotFound => {
                     continue;
@@ -66,90 +72,72 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
             .is_dir();
 
             if is_dir {
-                let parallelism = thread::available_parallelism()
-                    .unwrap_or(const { NonZeroUsize::new(1).unwrap() });
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .max_blocking_threads(parallelism.get())
-                    .build()
-                    .map_err(Error::RuntimeCreation)?;
-
-                return runtime.block_on(async {
-                    run_deletion_scheduler(
-                        file,
-                        RemoveOp {
-                            files,
-                            force: self.force,
-                            preserve_root: self.preserve_root,
-                        },
-                    )
-                });
+                let (tasks, _) = &*scheduling;
+                drop(
+                    tasks.send(Message::Node(TreeNode {
+                        path: CString::new(OsString::from(file.into_owned()).into_vec())
+                            .map_err(|_| Error::BadPath)?,
+                        _parent: None,
+                        messages: tasks.clone(),
+                    })),
+                );
+            } else {
+                fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
             }
-
-            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
         }
+
+        if let Some((tasks, thread)) = scheduling.into_inner() {
+            drop(tasks);
+            thread.join().map_err(|_| Error::Join)??;
+        }
+
         Ok(())
     }
 }
 
-fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
-    pending_dir: Cow<'a, Path>,
-    RemoveOp {
-        files,
-        force,
-        preserve_root,
-    }: RemoveOp<'a, F>,
-) -> Result<(), Error> {
-    let error_queue = Arc::new(RawOneLatest::default());
-    let mut dirs = 0;
+#[allow(clippy::needless_pass_by_value)]
+fn root_worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+    let mut available_parallelism = thread::available_parallelism()
+        .map(NonZeroUsize::get)
+        .unwrap_or(1)
+        - 1;
 
-    let mut spawn_dir_deletion = |file: Cow<Path>| {
-        dirs += 1;
+    thread::scope(|scope| {
+        let mut threads = Vec::with_capacity(available_parallelism);
 
-        let node = TreeNode {
-            path: CString::new(OsString::from(file.into_owned()).into_vec()).unwrap(),
-            parent: None,
-            error_queue: error_queue.clone(),
-        };
-        task::spawn_blocking(move || delete_dir(node))
-    };
-
-    spawn_dir_deletion(pending_dir);
-
-    for file in files {
-        if preserve_root && file == Path::new("/") {
-            return Err(Error::PreserveRoot);
-        }
-        let is_dir = match file.metadata() {
-            Err(e) if force && e.kind() == io::ErrorKind::NotFound => {
-                continue;
+        for node in &tasks {
+            if available_parallelism > 0 {
+                available_parallelism -= 1;
+                threads.push(scope.spawn({
+                    let tasks = tasks.clone();
+                    || worker_thread(tasks)
+                }));
             }
-            r => r,
-        }
-        .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
-        .is_dir();
 
-        if is_dir {
-            spawn_dir_deletion(file);
-        } else {
-            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+            match node {
+                Message::Node(node) => delete_dir(node)?,
+                Message::Error(e) => return Err(e),
+            }
         }
-    }
 
-    while dirs > 0 {
-        error_queue.pop()?;
-        dirs -= 1;
+        for thread in threads {
+            thread.join().map_err(|_| Error::Join)??;
+        }
+        Ok(())
+    })
+}
+
+fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+    for node in tasks {
+        match node {
+            Message::Node(node) => delete_dir(node)?,
+            Message::Error(e) => return Err(e),
+        }
     }
     Ok(())
 }
 
-fn delete_dir(node: TreeNode) {
-    let error_queue = node.error_queue.clone();
-    if let e @ Err(_) = delete_dir_internal(node) {
-        error_queue.push(e);
-    }
-}
-
-fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
+fn delete_dir(node: TreeNode) -> Result<(), Error> {
     thread_local! {
         static BUF: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(8192));
     }
@@ -176,8 +164,8 @@ fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
             }
 
             if file.file_type() == FileType::Directory {
-                task::spawn_blocking({
-                    let node = TreeNode {
+                node.messages
+                    .send(Message::Node(TreeNode {
                         path: {
                             let prefix = node.path.as_bytes();
                             let name = file.file_name().to_bytes_with_nul();
@@ -188,11 +176,10 @@ fn delete_dir_internal(node: TreeNode) -> Result<(), Error> {
                             path.extend_from_slice(name);
                             unsafe { CString::from_vec_with_nul_unchecked(path) }
                         },
-                        parent: Some(node.clone()),
-                        error_queue: node.error_queue.clone(),
-                    };
-                    move || delete_dir(node)
-                });
+                        _parent: Some(node.clone()),
+                        messages: node.messages.clone(),
+                    }))
+                    .map_err(|_| Error::Internal)?;
             } else {
                 unlinkat(&dir, file.file_name(), AtFlags::empty())
                     .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
@@ -221,20 +208,61 @@ impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
     }
 }
 
+enum Message {
+    Node(TreeNode),
+    Error(Error),
+}
+
 struct TreeNode {
     path: CString,
-    parent: Option<Arc<TreeNode>>,
-    error_queue: Arc<RawOneLatest<Result<(), Error>>>,
+    // Needed for the recursive drop implementation
+    _parent: Option<Arc<TreeNode>>,
+    messages: Sender<Message>,
 }
 
 impl Drop for TreeNode {
     fn drop(&mut self) {
-        if let e @ Err(_) = unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
+        if let Err(e) = unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
             .map_io_err(|| format!("Failed to delete directory: {:?}", self.path))
         {
-            self.error_queue.push(e);
-        } else if self.parent.is_none() {
-            self.error_queue.push(Ok(()));
+            // If the receiver closed, then another error must have already occurred.
+            drop(self.messages.send(Message::Error(e)));
         }
+    }
+}
+
+// TODO remove: https://github.com/rust-lang/rust/issues/74465#issuecomment-1364969188
+struct LazyCell<T, F = fn() -> T> {
+    cell: std::cell::OnceCell<T>,
+    init: std::cell::Cell<Option<F>>,
+}
+
+impl<T, F> LazyCell<T, F> {
+    pub const fn new(init: F) -> Self {
+        Self {
+            cell: std::cell::OnceCell::new(),
+            init: std::cell::Cell::new(Some(init)),
+        }
+    }
+
+    fn into_inner(self) -> Option<T> {
+        self.cell.into_inner()
+    }
+}
+
+#[allow(clippy::option_if_let_else)]
+impl<T, F: FnOnce() -> T> LazyCell<T, F> {
+    fn force(this: &Self) -> &T {
+        this.cell.get_or_init(|| match this.init.take() {
+            Some(f) => f(),
+            None => panic!("`Lazy` instance has previously been poisoned"),
+        })
+    }
+}
+
+impl<T, F: FnOnce() -> T> std::ops::Deref for LazyCell<T, F> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        Self::force(self)
     }
 }
