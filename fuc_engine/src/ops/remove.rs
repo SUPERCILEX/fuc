@@ -91,8 +91,6 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     }
 }
 
-// TODO add tracing to each method
-// TODO add debug logging for each fs op
 fn run_deletion_scheduler<'a, F: IntoIterator<Item = Cow<'a, Path>>>(
     pending_dir: Cow<'a, Path>,
     RemoveOp {
