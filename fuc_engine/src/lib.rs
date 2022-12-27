@@ -20,9 +20,9 @@ pub enum Error {
     PreserveRoot,
     #[error("Failed to join thread.")]
     Join,
-    #[error("A file path was invalid.")]
+    #[error("Invalid file path.")]
     BadPath,
-    #[error("A file already exists.")]
+    #[error("File or directory already exists.")]
     AlreadyExists,
     #[error("An internal bug occurred, please report this.")]
     Internal,
