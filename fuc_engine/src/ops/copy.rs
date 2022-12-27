@@ -77,6 +77,7 @@ mod compat {
         cell::RefCell,
         ffi::{CStr, CString},
         num::NonZeroUsize,
+        os::fd::{AsFd, OwnedFd},
         path::Path,
         thread,
         thread::JoinHandle,
@@ -117,6 +118,7 @@ mod compat {
                     from: path_buf_to_cstring(from.into_owned())?,
                     to: path_buf_to_cstring(to.into_owned())?,
                     messages: tasks.clone(),
+                    root_to_inode: None,
                 })
                 .map_err(|_| Error::Internal)
         }
@@ -149,7 +151,7 @@ mod compat {
                     }));
                 }
 
-                copy_dir(&node)?;
+                copy_dir(node)?;
             }
 
             for thread in threads {
@@ -161,12 +163,12 @@ mod compat {
 
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         for node in tasks {
-            copy_dir(&node)?;
+            copy_dir(node)?;
         }
         Ok(())
     }
 
-    fn copy_dir(node: &TreeNode) -> Result<(), Error> {
+    fn copy_dir(mut node: TreeNode) -> Result<(), Error> {
         thread_local! {
             static BUF: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(8192));
         }
@@ -179,25 +181,8 @@ mod compat {
                 Mode::empty(),
             )
             .map_io_err(|| format!("Failed to open directory: {:?}", node.from))?;
-            {
-                const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
-
-                let from_perms = statx(&from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
-                    .map_io_err(|| format!("Failed to stat directory: {:?}", node.from))?;
-                mkdirat(
-                    cwd(),
-                    node.to.as_c_str(),
-                    Mode::from_raw_mode(RawMode::from(from_perms.stx_mode)),
-                )
-                .map_io_err(|| format!("Failed to create directory: {:?}", node.to))?;
-            }
-            let to_dir = openat(
-                cwd(),
-                node.to.as_c_str(),
-                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
-                Mode::empty(),
-            )
-            .map_io_err(|| format!("Failed to open directory: {:?}", node.to))?;
+            let to_dir = copy_one_dir(&from_dir, &node)?;
+            let root_to_inode = maybe_compute_root_to_inode(&to_dir, &mut node)?;
 
             let mut buf = buf.borrow_mut();
             let mut raw_dir = RawDir::new(&from_dir, buf.spare_capacity_mut());
@@ -210,6 +195,10 @@ mod compat {
                 if file.file_name() == DOT || file.file_name() == DOT_DOT {
                     continue;
                 }
+                if file.ino() == root_to_inode {
+                    // Block recursive descent from parent into child (e.g. cp parent parent/child).
+                    continue;
+                }
 
                 if file.file_type() == FileType::Directory {
                     node.messages
@@ -217,50 +206,70 @@ mod compat {
                             from: concat_cstrs(&node.from, file.file_name()),
                             to: concat_cstrs(&node.to, file.file_name()),
                             messages: node.messages.clone(),
+                            root_to_inode: node.root_to_inode,
                         })
                         .map_err(|_| Error::Internal)?;
                 } else {
-                    let from = openat(&from_dir, file.file_name(), OFlags::RDONLY, Mode::empty())
-                        .map_io_err(|| {
-                        format!(
-                            "Failed to open file: {:?}/{:?}",
-                            node.from,
-                            file.file_name()
-                        )
-                    })?;
-                    let from_perms = statx(
-                        &from_dir,
-                        file.file_name(),
-                        AtFlags::empty(),
-                        StatxFlags::MODE,
-                    )
-                    .map_io_err(|| {
-                        format!(
-                            "Failed to stat file: {:?}/{:?}",
-                            node.from,
-                            file.file_name()
-                        )
-                    })?;
-                    let to = openat(
-                        &to_dir,
-                        file.file_name(),
-                        OFlags::CREATE | OFlags::TRUNC | OFlags::WRONLY,
-                        Mode::from_raw_mode(RawMode::from(from_perms.stx_mode)),
-                    )
-                    .map_io_err(|| {
-                        format!("Failed to open file: {:?}/{:?}", node.to, file.file_name())
-                    })?;
-
-                    copy_file_range(&from, None, &to, None, u64::MAX).map_io_err(|| {
-                        format!(
-                            "Failed to copy file: {:?}/{:?}",
-                            node.from,
-                            file.file_name()
-                        )
-                    })?;
+                    copy_one_file(&from_dir, &to_dir, file.file_name(), &node)?;
                 }
             }
             Ok(())
+        })
+    }
+
+    fn copy_one_dir(from_dir: impl AsFd, node: &TreeNode) -> Result<OwnedFd, Error> {
+        const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
+
+        let from_perms = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
+            .map_io_err(|| format!("Failed to stat directory: {:?}", node.from))?;
+        mkdirat(
+            cwd(),
+            node.to.as_c_str(),
+            Mode::from_raw_mode(RawMode::from(from_perms.stx_mode)),
+        )
+        .map_io_err(|| format!("Failed to create directory: {:?}", node.to))?;
+        openat(
+            cwd(),
+            node.to.as_c_str(),
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
+            Mode::empty(),
+        )
+        .map_io_err(|| format!("Failed to open directory: {:?}", node.to))
+    }
+
+    fn copy_one_file(
+        from_dir: impl AsFd,
+        to_dir: impl AsFd,
+        file_name: &CStr,
+        node: &TreeNode,
+    ) -> Result<(), Error> {
+        let from = openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty())
+            .map_io_err(|| format!("Failed to open file: {:?}/{:?}", node.from, file_name))?;
+        let from_perms = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
+            .map_io_err(|| format!("Failed to stat file: {:?}/{:?}", node.from, file_name))?;
+        let to = openat(
+            &to_dir,
+            file_name,
+            OFlags::CREATE | OFlags::TRUNC | OFlags::WRONLY,
+            Mode::from_raw_mode(RawMode::from(from_perms.stx_mode)),
+        )
+        .map_io_err(|| format!("Failed to open file: {:?}/{:?}", node.to, file_name))?;
+
+        copy_file_range(&from, None, &to, None, u64::MAX)
+            .map_io_err(|| format!("Failed to copy file: {:?}/{:?}", node.from, file_name))
+            .map(|_| ())
+    }
+
+    fn maybe_compute_root_to_inode(to_dir: impl AsFd, node: &mut TreeNode) -> Result<u64, Error> {
+        Ok(if let Some(ino) = node.root_to_inode {
+            ino
+        } else {
+            const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
+
+            let to_stat = statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO)
+                .map_io_err(|| format!("Failed to stat directory: {:?}", node.to))?;
+            node.root_to_inode = Some(to_stat.stx_ino);
+            to_stat.stx_ino
         })
     }
 
@@ -268,6 +277,7 @@ mod compat {
         from: CString,
         to: CString,
         messages: Sender<TreeNode>,
+        root_to_inode: Option<u64>,
     }
 }
 
@@ -290,7 +300,7 @@ mod compat {
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
-            copy_dir(&from, &to).map_io_err(|| format!("Failed to copy directory: {from:?}"))
+            copy_dir(&from, &to, None).map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
         fn finish(self) -> Result<(), Error> {
@@ -298,21 +308,50 @@ mod compat {
         }
     }
 
-    fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), io::Error> {
+    fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(
+        from: P,
+        to: Q,
+        root_to_inode: Option<u64>,
+    ) -> Result<(), io::Error> {
         let to = to.as_ref();
         fs::create_dir(to)?;
+        #[cfg(unix)]
+        let root_to_inode = Some(maybe_compute_root_to_inode(to, root_to_inode)?);
+
         from.as_ref()
             .read_dir()?
             .par_bridge()
             .try_for_each(|dir_entry| -> io::Result<()> {
                 let dir_entry = dir_entry?;
+
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirEntryExt;
+                    if Some(dir_entry.ino()) == root_to_inode {
+                        return Ok(());
+                    }
+                }
+
                 let to = to.join(dir_entry.file_name());
                 if dir_entry.file_type()?.is_dir() {
-                    copy_dir(dir_entry.path(), to)?;
+                    copy_dir(dir_entry.path(), to, root_to_inode)?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }
                 Ok(())
             })
+    }
+
+    #[cfg(unix)]
+    fn maybe_compute_root_to_inode<P: AsRef<Path>>(
+        to: P,
+        root_to_inode: Option<u64>,
+    ) -> Result<u64, io::Error> {
+        Ok(if let Some(ino) = root_to_inode {
+            ino
+        } else {
+            use std::os::unix::fs::MetadataExt;
+            fs::metadata(to)?.ino()
+        })
     }
 }
