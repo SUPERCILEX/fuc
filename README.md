@@ -9,8 +9,10 @@ The FUC-ing project provides modern unix commands focused on performance.
 
 ## Goals
 
-1. Performance: being the fastest alternative on the planet is the primary goal.
-2. Usability: where applicable, improve the UX of the existing commands.
+1. Performance: if a reasonable improvement can be made, it will be.
+2. Efficiency: when only negligible performance improvements are left, remaining efforts are
+   focussed on minimizing wasted compute.
+3. Usability: where applicable, the UX of existing commands is improved.
 
 ## Non-goals
 
