@@ -4,7 +4,9 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 description = "Engine for the FUCing project."
-repository.workspace = true
+# TODO https://github.com/Enselic/cargo-public-api/pull/254
+#repository.workspace = true
+repository = "TMP"
 keywords = ["tools", "files"]
 categories = ["filesystem"]
 license.workspace = true
@@ -14,8 +16,14 @@ crossbeam-channel = "0.5.6"
 thiserror = "1.0.38"
 typed-builder = "0.11.0"
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "0.36.3", features = ["fs"], git = "https://github.com/bytecodealliance/rustix" }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+rayon = "1.6.1"
+
+[target.'cfg(not(any(target_os = "linux", target_os = "macos")))'.dependencies]
+remove_dir_all = "0.7.0"
 
 [dev-dependencies]
 expect-test = "1.4.0"

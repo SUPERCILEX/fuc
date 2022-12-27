@@ -72,7 +72,7 @@ fn one_dir() {
 }
 
 #[rstest]
-fn uniform(#[values(1_000, 100_000, 1_000_000)] num_files: u64) {
+fn uniform(#[values(1_000, 100_000)] num_files: u64) {
     let root = tempdir().unwrap();
     let dir = root.path().join("dir");
     Generator::builder()

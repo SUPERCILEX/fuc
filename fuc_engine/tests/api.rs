@@ -3,6 +3,7 @@ use public_api::PublicApi;
 
 #[test]
 #[cfg_attr(miri, ignore)] // gnu_get_libc_version breaks miri
+#[cfg(target_os = "linux")]
 fn api() {
     let json_path = rustdoc_json::Builder::default()
         .all_features(true)

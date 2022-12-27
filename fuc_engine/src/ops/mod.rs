@@ -1,13 +1,11 @@
 use std::{
     ffi::{CStr, CString, OsString},
     io,
-    os::unix::ffi::OsStringExt,
     path::{PathBuf, MAIN_SEPARATOR},
 };
 
 pub use copy::{copy_file, CopyOp};
 pub use remove::{remove_file, RemoveOp};
-use rustix::io::Errno;
 
 use crate::Error;
 
@@ -27,16 +25,20 @@ impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
     }
 }
 
-impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
+#[cfg(target_os = "linux")]
+impl<T> IoErr<Result<T, Error>> for Result<T, rustix::io::Errno> {
     fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
         self.map_err(io::Error::from).map_io_err(context)
     }
 }
 
+#[cfg(target_os = "linux")]
 fn path_buf_to_cstring(buf: PathBuf) -> Result<CString, Error> {
+    use std::os::unix::ffi::OsStringExt;
     CString::new(OsString::from(buf).into_vec()).map_err(|_| Error::BadPath)
 }
 
+#[cfg(target_os = "linux")]
 fn concat_cstrs(prefix: &CString, name: &CStr) -> CString {
     let prefix = prefix.as_bytes();
     let name = name.to_bytes_with_nul();
@@ -46,6 +48,16 @@ fn concat_cstrs(prefix: &CString, name: &CStr) -> CString {
     path.push(u8::try_from(MAIN_SEPARATOR).unwrap());
     path.extend_from_slice(name);
     unsafe { CString::from_vec_with_nul_unchecked(path) }
+}
+
+mod compat {
+    use crate::Error;
+
+    pub trait DirectoryOp<T> {
+        fn run(&self, dir: T) -> Result<(), Error>;
+
+        fn finish(self) -> Result<(), Error>;
+    }
 }
 
 // TODO remove: https://github.com/rust-lang/rust/issues/74465#issuecomment-1364969188
