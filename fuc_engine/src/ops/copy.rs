@@ -61,6 +61,11 @@ fn schedule_copies<'a>(
             .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?
             .is_dir();
 
+        if let Some(parent) = to.parent() {
+            fs::create_dir_all(parent)
+                .map_io_err(|| format!("Failed to create parent directory: {parent:?}"))?;
+        }
+
         if is_dir {
             copy.run((from, to))?;
         } else {

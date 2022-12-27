@@ -57,6 +57,23 @@ fn self_nested() {
 }
 
 #[test]
+fn non_existent_parent_dir() {
+    let root = tempdir().unwrap();
+    let dir1 = root.path().join("dir1");
+    fs::create_dir(&dir1).unwrap();
+    let dir2 = root.path().join("a/b/c/dir2");
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(dir1), Cow::Borrowed(dir2.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(dir2.exists());
+}
+
+#[test]
 fn one_file() {
     let root = tempdir().unwrap();
     let file1 = root.path().join("file1");
