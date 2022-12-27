@@ -3,11 +3,10 @@
 use std::{borrow::Cow, path::PathBuf};
 
 use clap::{ArgAction, Parser, ValueHint};
-use clap_verbosity_flag::Verbosity;
 use error_stack::{Report, Result};
 use fuc_engine::{Error, RemoveOp};
 
-/// A zippy alternative to `rm`, a tool to remove files or directories
+/// A zippy alternative to `rm`, a tool to remove files and directories
 #[derive(Parser, Debug)]
 #[clap(version, author = "Alex Saveau (@SUPERCILEX)")]
 #[clap(infer_subcommands = true, infer_long_args = true)]
@@ -26,8 +25,6 @@ struct Rmz {
     #[arg(long = "no-preserve-root", default_value_t = true)]
     #[arg(action = ArgAction::SetFalse)]
     preserve_root: bool,
-    #[clap(flatten)]
-    verbose: Verbosity,
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help information (use `--help` for more detail)")]
     #[arg(long_help = "Print help information (use `-h` for a summary)")]

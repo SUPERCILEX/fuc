@@ -41,7 +41,7 @@ Other options:
 
 ```console
 $ rmz --help
-A zippy alternative to `rm`, a tool to remove files or directories
+A zippy alternative to `rm`, a tool to remove files and directories
 
 Usage: rmz [OPTIONS] <FILES>...
 
@@ -55,12 +55,6 @@ Options:
 
       --no-preserve-root
           Allow deletion of `/`
-
-  -v, --verbose...
-          More output per occurrence
-
-  -q, --quiet...
-          Less output per occurrence
 
   -h, --help
           Print help information (use `-h` for a summary)

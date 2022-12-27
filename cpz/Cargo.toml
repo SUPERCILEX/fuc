@@ -9,14 +9,22 @@ keywords = ["tools", "files", "cp"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
+[dependencies]
+clap = { version = "4.0.32", features = ["derive", "wrap_help"] }
+error-stack = "0.2.4"
+fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
+thiserror = "1.0.38"
+
 [dev-dependencies]
 cache-size = "0.6.0"
 criterion = "0.4.0"
+expect-test = "1.4.0"
 memmap2 = "0.5.8"
 nix = "0.26.1"
 rand = "0.8.5"
 rustix = { version = "0.36.5", features = ["fs"] }
 tempfile = "3.3.0"
+trycmd = "0.14.6"
 
 [[bench]]
 name = "copy_methods"

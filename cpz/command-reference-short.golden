@@ -1,0 +1,12 @@
+A zippy alternative to `cp`, a tool to copy files and directories
+
+Usage: cpz [OPTIONS] <FROM> <TO>
+
+Arguments:
+  <FROM>  The file or directory to be copied
+  <TO>    The copy destination
+
+Options:
+  -f, --force    Overwrite existing files
+  -h, --help     Print help information (use `--help` for more detail)
+  -V, --version  Print version information
