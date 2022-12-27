@@ -270,7 +270,7 @@ dependencies = [
  "expect-test",
  "fuc_engine",
  "memmap2",
- "nix",
+ "nix 0.26.1",
  "rand",
  "rustix 0.36.5",
  "tempfile",
@@ -344,7 +344,7 @@ dependencies = [
  "autocfg",
  "cfg-if",
  "crossbeam-utils",
- "memoffset",
+ "memoffset 0.7.1",
  "scopeguard",
 ]
 
@@ -424,6 +424,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
 dependencies = [
  "instant",
+]
+
+[[package]]
+name = "fcp"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eeddae62255eb08f0ce1a820d36acbec4e3cb3ffef1fa7ca7a7122bd1c9120fb"
+dependencies = [
+ "nix 0.22.3",
+ "rayon",
+]
+
+[[package]]
+name = "fcp_cp"
+version = "0.0.0"
+dependencies = [
+ "fcp",
 ]
 
 [[package]]
@@ -779,6 +796,15 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memoffset"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
@@ -794,6 +820,19 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "nix"
+version = "0.22.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if",
+ "libc",
+ "memoffset 0.6.5",
+]
+
+[[package]]
+name = "nix"
 version = "0.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46a58d1d356c6597d08cde02c2f09d785b09e28711837b1ed667dc652c08a694"
@@ -801,7 +840,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.7.1",
  "pin-utils",
  "static_assertions",
 ]
@@ -1075,6 +1114,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rayon_cp"
+version = "0.0.0"
+dependencies = [
+ "rayon",
+]
+
+[[package]]
 name = "rayon_rm"
 version = "0.0.0"
 dependencies = [
@@ -1343,6 +1389,10 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stdlib_cp"
+version = "0.0.0"
 
 [[package]]
 name = "stdlib_rm"

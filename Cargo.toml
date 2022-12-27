@@ -6,6 +6,9 @@ members = [
     "comparisons/rayon_rm",
     "comparisons/og_crappy_rm",
     "comparisons/stdlib_rm",
+    "comparisons/rayon_cp",
+    "comparisons/stdlib_cp",
+    "comparisons/fcp_cp",
 ]
 
 [workspace.package]
