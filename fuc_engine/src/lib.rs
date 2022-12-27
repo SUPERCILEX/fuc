@@ -8,7 +8,7 @@ use std::io;
 
 use thiserror::Error;
 
-pub use crate::ops::{remove_file, remove_file as remove_dir_all, RemoveOp};
+pub use crate::ops::{copy_file, remove_file, remove_file as remove_dir_all, CopyOp, RemoveOp};
 
 mod ops;
 
@@ -22,6 +22,8 @@ pub enum Error {
     Join,
     #[error("A file path was invalid.")]
     BadPath,
+    #[error("A file already exists.")]
+    AlreadyExists,
     #[error("An internal bug occurred, please report this.")]
     Internal,
 }

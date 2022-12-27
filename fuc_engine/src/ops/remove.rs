@@ -1,24 +1,23 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::{CStr, CString, OsString},
+    ffi::{CStr, CString},
     fmt::Debug,
     fs, io,
     num::NonZeroUsize,
-    os::unix::ffi::OsStringExt,
-    path::{Path, MAIN_SEPARATOR},
+    path::Path,
     sync::Arc,
     thread,
 };
 
 use crossbeam_channel::{Receiver, Sender};
-use rustix::{
-    fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
-    io::Errno,
-};
+use rustix::fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir};
 use typed_builder::TypedBuilder;
 
-use crate::Error;
+use crate::{
+    ops::{concat_cstrs, path_buf_to_cstring, IoErr, LazyCell},
+    Error,
+};
 
 /// Removes a file or directory at this path, after removing all its contents.
 ///
@@ -90,14 +89,13 @@ fn schedule_deletions<'a, L>(
 
         if is_dir {
             let (tasks, _) = &**scheduling;
-            drop(
-                tasks.send(Message::Node(TreeNode {
-                    path: CString::new(OsString::from(file.into_owned()).into_vec())
-                        .map_err(|_| Error::BadPath)?,
+            tasks
+                .send(Message::Node(TreeNode {
+                    path: path_buf_to_cstring(file.into_owned())?,
                     _parent: None,
                     messages: tasks.clone(),
-                })),
-            );
+                }))
+                .map_err(|_| Error::Internal)?;
         } else {
             fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
         }
@@ -176,46 +174,23 @@ fn delete_dir(node: TreeNode) -> Result<(), Error> {
             if file.file_type() == FileType::Directory {
                 node.messages
                     .send(Message::Node(TreeNode {
-                        path: {
-                            let prefix = node.path.as_bytes();
-                            let name = file.file_name().to_bytes_with_nul();
-
-                            let mut path = Vec::with_capacity(prefix.len() + 1 + name.len());
-                            path.extend_from_slice(prefix);
-                            path.push(u8::try_from(MAIN_SEPARATOR).unwrap());
-                            path.extend_from_slice(name);
-                            unsafe { CString::from_vec_with_nul_unchecked(path) }
-                        },
+                        path: concat_cstrs(&node.path, file.file_name()),
                         _parent: Some(node.clone()),
                         messages: node.messages.clone(),
                     }))
                     .map_err(|_| Error::Internal)?;
             } else {
-                unlinkat(&dir, file.file_name(), AtFlags::empty())
-                    .map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+                unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
+                    format!(
+                        "Failed to delete file: {:?}/{:?}",
+                        node.path,
+                        file.file_name()
+                    )
+                })?;
             }
         }
         Ok(())
     })
-}
-
-trait IoErr<Out> {
-    fn map_io_err(self, f: impl FnOnce() -> String) -> Out;
-}
-
-impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
-    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
-        self.map_err(|error| Error::Io {
-            error,
-            context: context(),
-        })
-    }
-}
-
-impl<T> IoErr<Result<T, Error>> for Result<T, Errno> {
-    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
-        self.map_err(io::Error::from).map_io_err(context)
-    }
 }
 
 enum Message {
@@ -238,41 +213,5 @@ impl Drop for TreeNode {
             // If the receiver closed, then another error must have already occurred.
             drop(self.messages.send(Message::Error(e)));
         }
-    }
-}
-
-// TODO remove: https://github.com/rust-lang/rust/issues/74465#issuecomment-1364969188
-struct LazyCell<T, F = fn() -> T> {
-    cell: std::cell::OnceCell<T>,
-    init: std::cell::Cell<Option<F>>,
-}
-
-impl<T, F> LazyCell<T, F> {
-    pub const fn new(init: F) -> Self {
-        Self {
-            cell: std::cell::OnceCell::new(),
-            init: std::cell::Cell::new(Some(init)),
-        }
-    }
-
-    fn into_inner(self) -> Option<T> {
-        self.cell.into_inner()
-    }
-}
-
-#[allow(clippy::option_if_let_else)]
-impl<T, F: FnOnce() -> T> LazyCell<T, F> {
-    fn force(this: &Self) -> &T {
-        this.cell.get_or_init(|| match this.init.take() {
-            Some(f) => f(),
-            None => panic!("`Lazy` instance has previously been poisoned"),
-        })
-    }
-}
-
-impl<T, F: FnOnce() -> T> std::ops::Deref for LazyCell<T, F> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        Self::force(self)
     }
 }

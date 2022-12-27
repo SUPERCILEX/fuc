@@ -1,4 +1,4 @@
-use std::{fmt, fs, fs::File, num::NonZeroU64};
+use std::{borrow::Cow, fmt, fs, fs::File, num::NonZeroU64};
 
 use ftzz::generator::{Generator, NumFilesWithRatio};
 use rstest::rstest;
@@ -11,6 +11,38 @@ impl fmt::Write for Sink {
     fn write_str(&mut self, _: &str) -> fmt::Result {
         Ok(())
     }
+}
+
+#[test]
+fn non_existent_file_no_force() {
+    let root = tempdir().unwrap();
+    let file = root.path().join("file");
+
+    fuc_engine::RemoveOp::builder()
+        .files([Cow::Borrowed(file.as_path())])
+        .force(false)
+        .build()
+        .run()
+        .unwrap_err();
+
+    assert!(!file.exists());
+    assert!(root.as_ref().exists());
+}
+
+#[test]
+fn non_existent_file_force() {
+    let root = tempdir().unwrap();
+    let file = root.path().join("file");
+
+    fuc_engine::RemoveOp::builder()
+        .files([Cow::Borrowed(file.as_path())])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(!file.exists());
+    assert!(root.as_ref().exists());
 }
 
 #[test]
