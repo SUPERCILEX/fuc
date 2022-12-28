@@ -22,12 +22,12 @@ expect-test = "1.4.0"
 memmap2 = "0.5.8"
 nix = "0.26.1"
 rand = "0.8.5"
-rustix = { version = "0.36.5", features = ["fs"] }
+rustix = { version = "0.36.6", features = ["fs"] }
 tempfile = "3.3.0"
 trycmd = "0.14.6"
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
-rustix = { version = "0.36.5", features = ["fs"] }
+rustix = { version = "0.36.6", features = ["fs"] }
 
 [[bench]]
 name = "copy_methods"

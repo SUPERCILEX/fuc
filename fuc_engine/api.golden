@@ -1,13 +1,13 @@
 pub mod fuc_engine
 pub enum fuc_engine::Error
-pub enum variant fuc_engine::Error::AlreadyExists
-pub enum variant fuc_engine::Error::BadPath
-pub enum variant fuc_engine::Error::Internal
-pub enum variant fuc_engine::Error::Io
-pub struct field fuc_engine::Error::Io::context: alloc::string::String
-pub struct field fuc_engine::Error::Io::error: std::io::error::Error
-pub enum variant fuc_engine::Error::Join
-pub enum variant fuc_engine::Error::PreserveRoot
+pub fuc_engine::Error::AlreadyExists
+pub fuc_engine::Error::BadPath
+pub fuc_engine::Error::Internal
+pub fuc_engine::Error::Io
+pub fuc_engine::Error::Io::context: alloc::string::String
+pub fuc_engine::Error::Io::error: std::io::error::Error
+pub fuc_engine::Error::Join
+pub fuc_engine::Error::PreserveRoot
 impl core::fmt::Debug for fuc_engine::Error
 pub fn fuc_engine::Error::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Display for fuc_engine::Error
