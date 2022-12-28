@@ -8,23 +8,26 @@ use fuc_engine::{CopyOp, Error};
 
 /// A zippy alternative to `cp`, a tool to copy files and directories
 #[derive(Parser, Debug)]
-#[clap(version, author = "Alex Saveau (@SUPERCILEX)")]
-#[clap(infer_subcommands = true, infer_long_args = true)]
-#[clap(max_term_width = 100)]
+#[command(version, author = "Alex Saveau (@SUPERCILEX)")]
+#[command(infer_subcommands = true, infer_long_args = true)]
+#[command(max_term_width = 100)]
 #[command(disable_help_flag = true)]
-#[cfg_attr(test, clap(help_expected = true))]
+#[cfg_attr(test, command(help_expected = true))]
 struct Cpz {
     /// The file or directory to be copied
-    #[clap(required = true)]
-    #[clap(value_hint = ValueHint::AnyPath)]
+    #[arg(required = true)]
+    #[arg(value_hint = ValueHint::AnyPath)]
     from: PathBuf,
+
     /// The copy destination
-    #[clap(required = true)]
-    #[clap(value_hint = ValueHint::AnyPath)]
+    #[arg(required = true)]
+    #[arg(value_hint = ValueHint::AnyPath)]
     to: PathBuf,
+
     /// Overwrite existing files
     #[arg(short, long, default_value_t = false)]
     force: bool,
+
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help information (use `--help` for more detail)")]
     #[arg(long_help = "Print help information (use `-h` for a summary)")]
