@@ -96,6 +96,9 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             tool: cargo
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            tool: cargo
           - target: x86_64-apple-darwin
             os: macos-latest
             tool: cargo
@@ -115,14 +118,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust
-        run: rustup target add ${{ matrix.target }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          rustup component add rust-src
       - name: Install cross
         if: matrix.tool == 'cross'
         run: cargo install cross
       - name: Build binary
-        run: |
-          ${{ matrix.tool }} rustc --release --locked --bin=rmz --target=${{ matrix.target }} -- -C target-feature=+crt-static
-          ${{ matrix.tool }} rustc --release --locked --bin=cpz --target=${{ matrix.target }} -- -C target-feature=+crt-static
+        run: ${{ matrix.tool }} build --release --locked --target=${{ matrix.target }} -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort
       - name: Upload binary
         if: matrix.os != 'windows-latest'
         uses: svenstaro/upload-release-action@v2
