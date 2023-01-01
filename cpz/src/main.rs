@@ -65,10 +65,7 @@ fn main() -> Result<(), CliError> {
 
 #[cfg(test)]
 mod cli_tests {
-    use std::fmt::Write;
-
-    use clap::{Command, CommandFactory};
-    use expect_test::expect_file;
+    use clap::CommandFactory;
 
     use super::*;
 
@@ -78,45 +75,7 @@ mod cli_tests {
     }
 
     #[test]
-    #[cfg_attr(miri, ignore)] // wrap_help breaks miri
     fn help_for_review() {
-        let mut command = Cpz::command();
-
-        command.build();
-
-        let mut long = String::new();
-        let mut short = String::new();
-
-        write_help(&mut long, &mut command, LongOrShortHelp::Long);
-        write_help(&mut short, &mut command, LongOrShortHelp::Short);
-
-        expect_file!["../command-reference.golden"].assert_eq(&long);
-        expect_file!["../command-reference-short.golden"].assert_eq(&short);
-    }
-
-    #[derive(Copy, Clone)]
-    enum LongOrShortHelp {
-        Long,
-        Short,
-    }
-
-    fn write_help(buffer: &mut impl Write, cmd: &mut Command, long_or_short_help: LongOrShortHelp) {
-        write!(
-            buffer,
-            "{}",
-            match long_or_short_help {
-                LongOrShortHelp::Long => cmd.render_long_help(),
-                LongOrShortHelp::Short => cmd.render_help(),
-            }
-        )
-        .unwrap();
-
-        for sub in cmd.get_subcommands_mut() {
-            writeln!(buffer).unwrap();
-            writeln!(buffer, "---").unwrap();
-            writeln!(buffer).unwrap();
-
-            write_help(buffer, sub, long_or_short_help);
-        }
+        supercilex_tests::help_for_review(Cpz::command());
     }
 }

@@ -1,6 +1,7 @@
+use std::io;
+#[cfg(target_os = "linux")]
 use std::{
     ffi::{CStr, CString, OsString},
-    io,
     path::{PathBuf, MAIN_SEPARATOR},
 };
 
@@ -61,11 +62,13 @@ mod compat {
 }
 
 // TODO remove: https://github.com/rust-lang/rust/issues/74465#issuecomment-1364969188
+#[cfg(target_os = "linux")]
 struct LazyCell<T, F = fn() -> T> {
     cell: std::cell::OnceCell<T>,
     init: std::cell::Cell<Option<F>>,
 }
 
+#[cfg(target_os = "linux")]
 impl<T, F> LazyCell<T, F> {
     pub const fn new(init: F) -> Self {
         Self {
@@ -80,6 +83,7 @@ impl<T, F> LazyCell<T, F> {
 }
 
 #[allow(clippy::option_if_let_else)]
+#[cfg(target_os = "linux")]
 impl<T, F: FnOnce() -> T> LazyCell<T, F> {
     fn force(this: &Self) -> &T {
         this.cell.get_or_init(|| match this.init.take() {
@@ -89,6 +93,7 @@ impl<T, F: FnOnce() -> T> LazyCell<T, F> {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl<T, F: FnOnce() -> T> std::ops::Deref for LazyCell<T, F> {
     type Target = T;
     fn deref(&self) -> &T {

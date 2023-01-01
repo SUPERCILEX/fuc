@@ -268,12 +268,11 @@ dependencies = [
  "clap 4.0.32",
  "criterion",
  "error-stack",
- "expect-test",
  "fuc_engine",
  "memmap2",
- "nix",
  "rand",
  "rustix",
+ "supercilex-tests",
  "tempfile",
  "thiserror",
  "trycmd",
@@ -472,14 +471,12 @@ name = "fuc_engine"
 version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
- "expect-test",
  "ftzz",
- "public-api",
  "rayon",
  "remove_dir_all 0.7.0",
  "rstest",
- "rustdoc-json",
  "rustix",
+ "supercilex-tests",
  "tempfile",
  "thiserror",
  "typed-builder",
@@ -751,6 +748,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 
 [[package]]
+name = "lint"
+version = "0.0.0"
+dependencies = [
+ "supercilex-tests",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -787,20 +791,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "nix"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46a58d1d356c6597d08cde02c2f09d785b09e28711837b1ed667dc652c08a694"
-dependencies = [
- "bitflags",
- "cfg-if",
- "libc",
- "memoffset",
- "pin-utils",
- "static_assertions",
 ]
 
 [[package]]
@@ -848,9 +838,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "6f61fba1741ea2b3d6a1e3178721804bb716a68a6aeba1149b5d52e3d464ea66"
 
 [[package]]
 name = "oorandom"
@@ -1137,12 +1127,12 @@ dependencies = [
  "clap 4.0.32",
  "criterion",
  "error-stack",
- "expect-test",
  "ftzz",
  "fuc_engine",
  "og_crappy_rm",
  "rayon_rm",
  "stdlib_rm",
+ "supercilex-tests",
  "tempfile",
  "thiserror",
  "trycmd",
@@ -1342,12 +1332,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "485e65c1203eb37244465e857d15a26d3a85a5410648ccb53b18bd44cb3a7336"
 
 [[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
 name = "stdlib_cp"
 version = "0.0.0"
 
@@ -1360,6 +1344,18 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
+name = "supercilex-tests"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6914ca9fdc6818522d72c2588dfe2c11ad9cd403dc631f9ec852541a167646e5"
+dependencies = [
+ "clap 4.0.32",
+ "expect-test",
+ "public-api",
+ "rustdoc-json",
+]
 
 [[package]]
 name = "supports-color"

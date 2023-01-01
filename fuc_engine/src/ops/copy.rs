@@ -305,7 +305,13 @@ mod compat {
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
-            copy_dir(&from, &to, None).map_io_err(|| format!("Failed to copy directory: {from:?}"))
+            copy_dir(
+                &from,
+                to,
+                #[cfg(unix)]
+                None,
+            )
+            .map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
         fn finish(self) -> Result<(), Error> {
@@ -316,7 +322,7 @@ mod compat {
     fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(
         from: P,
         to: Q,
-        root_to_inode: Option<u64>,
+        #[cfg(unix)] root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
         fs::create_dir(to)?;
@@ -339,7 +345,12 @@ mod compat {
 
                 let to = to.join(dir_entry.file_name());
                 if dir_entry.file_type()?.is_dir() {
-                    copy_dir(dir_entry.path(), to, root_to_inode)?;
+                    copy_dir(
+                        dir_entry.path(),
+                        to,
+                        #[cfg(unix)]
+                        root_to_inode,
+                    )?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }

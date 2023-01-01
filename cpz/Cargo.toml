@@ -18,11 +18,10 @@ thiserror = "1.0.38"
 [dev-dependencies]
 cache-size = "0.6.0"
 criterion = "0.4.0"
-expect-test = "1.4.0"
 memmap2 = "0.5.8"
-nix = "0.26.1"
 rand = "0.8.5"
 rustix = { version = "0.36.6", features = ["fs"] }
+supercilex-tests = "0.1.2"
 tempfile = "3.3.0"
 trycmd = "0.14.6"
 

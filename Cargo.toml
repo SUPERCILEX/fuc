@@ -17,6 +17,14 @@ edition = "2021"
 repository = "https://github.com/SUPERCILEX/fuc"
 license = "Apache-2.0"
 
+[package]
+name = "lint"
+version = "0.0.0"
+publish = false
+
+[dev-dependencies]
+supercilex-tests = "0.1.2"
+
 [profile.release]
 lto = true
 codegen-units = 1

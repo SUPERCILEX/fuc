@@ -4,7 +4,6 @@ use std::{
     fs::{copy, File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    thread,
     time::Duration,
 };
 
@@ -32,7 +31,13 @@ impl NormalTempFile {
 
         let buf = create_random_buffer(usize::try_from(bytes).unwrap(), direct_io);
 
-        open_standard(&from, direct_io).write_all(&buf).unwrap();
+        open_standard(
+            &from,
+            #[cfg(target_os = "linux")]
+            direct_io,
+        )
+        .write_all(&buf)
+        .unwrap();
 
         Self {
             to: dir.path().join("to"),
@@ -207,7 +212,11 @@ fn just_writes(c: &mut Criterion) {
                         (dir, buf)
                     },
                     |(dir, buf)| {
-                        let mut out = open_standard(dir.path().join("file").as_ref(), true);
+                        let mut out = open_standard(
+                            dir.path().join("file").as_ref(),
+                            #[cfg(target_os = "linux")]
+                            true,
+                        );
                         out.set_len(*num_bytes).unwrap();
 
                         out.write_all(&buf).unwrap();
@@ -334,7 +343,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
             b.iter_batched(
                 || NormalTempFile::create(*num_bytes, direct_io),
                 |files| {
-                    use std::os::unix::fs::FileExt;
+                    use std::{os::unix::fs::FileExt, thread};
 
                     let threads =
                         u64::try_from(thread::available_parallelism().unwrap().get()).unwrap();
@@ -516,29 +525,17 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     );
 }
 
-fn open_standard(path: &Path, direct_io: bool) -> File {
+fn open_standard(path: &Path, #[cfg(target_os = "linux")] direct_io: bool) -> File {
     let mut options = OpenOptions::new();
     options.write(true).create(true).truncate(true);
 
     #[cfg(target_os = "linux")]
     if direct_io {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(nix::libc::O_DIRECT);
+        options.custom_flags(i32::try_from(rustix::io::PipeFlags::DIRECT.bits()).unwrap());
     }
 
-    let file = options.open(path).unwrap();
-
-    #[cfg(target_os = "macos")]
-    if direct_io {
-        use nix::{
-            errno::Errno,
-            libc::{fcntl, F_NOCACHE},
-        };
-        Errno::result(unsafe { fcntl(file.as_raw_fd(), F_NOCACHE) }).unwrap();
-    }
-
-    #[allow(clippy::let_and_return)]
-    file
+    options.open(path).unwrap()
 }
 
 fn write_from_buffer(to: PathBuf, mut reader: BufReader<File>) {
