@@ -3,6 +3,7 @@
 use std::{borrow::Cow, path::PathBuf};
 
 use clap::{ArgAction, Parser, ValueHint};
+use clap2 as clap;
 use error_stack::{Report, Result};
 use fuc_engine::{Error, RemoveOp};
 
@@ -10,7 +11,6 @@ use fuc_engine::{Error, RemoveOp};
 #[derive(Parser, Debug)]
 #[command(version, author = "Alex Saveau (@SUPERCILEX)")]
 #[command(infer_subcommands = true, infer_long_args = true)]
-#[command(max_term_width = 100)]
 #[command(disable_help_flag = true)]
 #[cfg_attr(test, command(help_expected = true))]
 struct Rmz {
@@ -29,8 +29,8 @@ struct Rmz {
     preserve_root: bool,
 
     #[arg(short, long, short_alias = '?', global = true)]
-    #[arg(action = ArgAction::Help, help = "Print help information (use `--help` for more detail)")]
-    #[arg(long_help = "Print help information (use `-h` for a summary)")]
+    #[arg(action = ArgAction::Help, help = "Print help (use `--help` for more detail)")]
+    #[arg(long_help = "Print help (use `-h` for a summary)")]
     help: Option<bool>,
 }
 
@@ -77,6 +77,6 @@ mod cli_tests {
 
     #[test]
     fn help_for_review() {
-        supercilex_tests::help_for_review(Rmz::command());
+        supercilex_tests::help_for_review2(Rmz::command());
     }
 }

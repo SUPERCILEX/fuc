@@ -10,7 +10,7 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.0.32", features = ["derive", "wrap_help"] }
+clap2 = { version = "4.0.32", features = ["derive", "wrap_help"] }
 error-stack = "0.2.4"
 fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
 thiserror = "1.0.38"
@@ -21,7 +21,7 @@ criterion = "0.4.0"
 memmap2 = "0.5.8"
 rand = "0.8.5"
 rustix = { version = "0.36.6", features = ["fs"] }
-supercilex-tests = "0.1.2"
+supercilex-tests = "0.2.0"
 tempfile = "3.3.0"
 trycmd = "0.14.6"
 

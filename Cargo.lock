@@ -193,6 +193,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap2"
+version = "4.0.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d77f5d98fe06d2365f080d2c9385fb94855ebabeccf6125862363e468799245"
+dependencies = [
+ "bitflags",
+ "clap_derive",
+ "clap_lex 0.3.0",
+ "is-terminal",
+ "once_cell",
+ "strsim",
+ "termcolor",
+ "terminal_size",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,7 +281,7 @@ name = "cpz"
 version = "0.1.0"
 dependencies = [
  "cache-size",
- "clap 4.0.32",
+ "clap2",
  "criterion",
  "error-stack",
  "fuc_engine",
@@ -1124,7 +1140,7 @@ dependencies = [
 name = "rmz"
 version = "0.1.0"
 dependencies = [
- "clap 4.0.32",
+ "clap2",
  "criterion",
  "error-stack",
  "ftzz",
@@ -1347,11 +1363,12 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "supercilex-tests"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6914ca9fdc6818522d72c2588dfe2c11ad9cd403dc631f9ec852541a167646e5"
+checksum = "5420446f4e630eaa80027047dc1167499ae0d3e92c5f6a500edaeee1b82b0d15"
 dependencies = [
  "clap 4.0.32",
+ "clap2",
  "expect-test",
  "public-api",
  "rustdoc-json",

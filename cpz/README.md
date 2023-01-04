@@ -57,9 +57,9 @@ Options:
           Overwrite existing files
 
   -h, --help
-          Print help information (use `-h` for a summary)
+          Print help (use `-h` for a summary)
 
   -V, --version
-          Print version information
+          Print version
 
 ```

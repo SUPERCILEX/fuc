@@ -8,5 +8,5 @@ Arguments:
 
 Options:
   -f, --force    Overwrite existing files
-  -h, --help     Print help information (use `--help` for more detail)
-  -V, --version  Print version information
+  -h, --help     Print help (use `--help` for more detail)
+  -V, --version  Print version
