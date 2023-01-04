@@ -23,7 +23,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: Build project
-        run: cargo build --release --all-features
+        run: cargo build --workspace --release
 
   test:
     strategy:
@@ -47,7 +47,7 @@ jobs:
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
       - name: Run tests
-        run: cargo test
+        run: cargo test --workspace
 
   deploy_release:
     needs: [build, test]
@@ -57,7 +57,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Publish release
-        run: cargo publish
+        run: |
+          cargo publish --package fuc_engine
+          cargo publish --package rmz
+          cargo publish --package cpz
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -98,7 +101,7 @@ jobs:
         if: matrix.tool == 'cross'
         run: cargo install cross
       - name: Build binary
-        run: ${{ matrix.tool }} build --release --locked --target=${{ matrix.target }} -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort
+        run: ${{ matrix.tool }} build --workspace --release --locked --target=${{ matrix.target }} -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort
       - name: Upload binary
         if: matrix.os != 'windows-latest'
         uses: svenstaro/upload-release-action@v2
