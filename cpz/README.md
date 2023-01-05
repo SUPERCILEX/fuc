@@ -43,11 +43,11 @@ Other options:
 $ cpz --help
 A zippy alternative to `cp`, a tool to copy files and directories
 
-Usage: cpz[EXE] [OPTIONS] <FROM> <TO>
+Usage: cpz[EXE] [OPTIONS] <FROM>... <TO>
 
 Arguments:
-  <FROM>
-          The file or directory to be copied
+  <FROM>...
+          The file(s) or directory(ies) to be copied
 
   <TO>
           The copy destination

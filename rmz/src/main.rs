@@ -12,6 +12,7 @@ use fuc_engine::{Error, RemoveOp};
 #[command(version, author = "Alex Saveau (@SUPERCILEX)")]
 #[command(infer_subcommands = true, infer_long_args = true)]
 #[command(disable_help_flag = true)]
+#[command(arg_required_else_help = true)]
 #[cfg_attr(test, command(help_expected = true))]
 struct Rmz {
     /// The files and/or directories to be removed
