@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "cpz"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "cache-size",
  "clap2",
@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "fuc_engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "crossbeam-channel",
  "ftzz",
@@ -1138,7 +1138,7 @@ dependencies = [
 
 [[package]]
 name = "rmz"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap2",
  "criterion",
@@ -1478,9 +1478,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.23.1"
+version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a54aca0c15d014013256222ba0ebed095673f89345dd79119d912eb561b7a8"
+checksum = "7125661431c26622a80ca5051a2f936c9a678318e0351007b0cc313143024e5c"
 dependencies = [
  "autocfg",
  "pin-project-lite",
@@ -1554,9 +1554,9 @@ dependencies = [
 
 [[package]]
 name = "trycmd"
-version = "0.14.7"
+version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "801dac5013463cf0bc159930013828d8bc0f5d0840fe0afc1686604b62469fe8"
+checksum = "efc283953d490e63682af2551b2c85b475f3c8d9cafda427a2b198936024ef86"
 dependencies = [
  "glob",
  "humantime",

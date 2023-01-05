@@ -12,14 +12,14 @@ license.workspace = true
 [dependencies]
 clap2 = { version = "4.0.32", features = ["derive", "wrap_help"] }
 error-stack = "0.2.4"
-fuc_engine = { version = "0.1.0", path = "../fuc_engine" }
+fuc_engine = { version = "1.0.0", path = "../fuc_engine" }
 thiserror = "1.0.38"
 
 [dev-dependencies]
 criterion = "0.4.0"
 ftzz = "1.1.4"
 tempfile = "3.3.0"
-trycmd = "0.14.7"
+trycmd = "0.14.8"
 rayon_rm = { path = "../comparisons/rayon_rm" }
 og_crappy_rm = { path = "../comparisons/og_crappy_rm" }
 stdlib_rm = { path = "../comparisons/stdlib_rm" }
