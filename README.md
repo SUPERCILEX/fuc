@@ -2,6 +2,8 @@
 
 The FUC-ing project provides modern unix commands focused on performance.
 
+Benchmarks are available under the [`comparisons`](comparisons/) folder.
+
 ## Commands
 
 - [`rmz`](rmz)
