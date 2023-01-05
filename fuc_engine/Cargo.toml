@@ -26,5 +26,5 @@ remove_dir_all = "0.7.0"
 [dev-dependencies]
 ftzz = "1.1.4"
 rstest = "0.16.0"
-supercilex-tests = "0.2.0"
+supercilex-tests = "0.2.1"
 tempfile = "3.3.0"
