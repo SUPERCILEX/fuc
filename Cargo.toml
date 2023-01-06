@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
 edition = "2021"
 repository = "https://github.com/SUPERCILEX/fuc"
