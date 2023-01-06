@@ -1,8 +1,9 @@
 use std::io;
 #[cfg(target_os = "linux")]
 use std::{
-    ffi::{CStr, CString, OsString},
-    path::{PathBuf, MAIN_SEPARATOR},
+    ffi::{CStr, CString, OsStr, OsString},
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf, MAIN_SEPARATOR},
 };
 
 pub use copy::{copy_file, CopyOp};
@@ -49,6 +50,12 @@ fn concat_cstrs(prefix: &CString, name: &CStr) -> CString {
     path.push(u8::try_from(MAIN_SEPARATOR).unwrap());
     path.extend_from_slice(name);
     unsafe { CString::from_vec_with_nul_unchecked(path) }
+}
+
+#[cfg(target_os = "linux")]
+fn join_cstr_paths(path: &CString, name: &CStr) -> PathBuf {
+    Path::new(OsStr::from_bytes(path.as_bytes()))
+        .join(Path::new(OsStr::from_bytes(name.to_bytes())))
 }
 
 mod compat {

@@ -95,7 +95,10 @@ mod compat {
     };
 
     use crate::{
-        ops::{compat::DirectoryOp, concat_cstrs, path_buf_to_cstring, IoErr, LazyCell},
+        ops::{
+            compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring, IoErr,
+            LazyCell,
+        },
         Error,
     };
 
@@ -248,17 +251,32 @@ mod compat {
         file_name: &CStr,
         node: &TreeNode,
     ) -> Result<(), Error> {
-        let from = openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty())
-            .map_io_err(|| format!("Failed to open file: {:?}/{:?}", node.from, file_name))?;
+        let from =
+            openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty()).map_io_err(|| {
+                format!(
+                    "Failed to open file: {:?}",
+                    join_cstr_paths(&node.from, file_name)
+                )
+            })?;
         let from_perms = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
-            .map_io_err(|| format!("Failed to stat file: {:?}/{:?}", node.from, file_name))?;
+            .map_io_err(|| {
+                format!(
+                    "Failed to stat file: {:?}",
+                    join_cstr_paths(&node.from, file_name)
+                )
+            })?;
         let to = openat(
             &to_dir,
             file_name,
             OFlags::CREATE | OFlags::TRUNC | OFlags::WRONLY,
             Mode::from_raw_mode(RawMode::from(from_perms.stx_mode)),
         )
-        .map_io_err(|| format!("Failed to open file: {:?}/{:?}", node.to, file_name))?;
+        .map_io_err(|| {
+            format!(
+                "Failed to open file: {:?}",
+                join_cstr_paths(&node.to, file_name)
+            )
+        })?;
 
         copy_file_range(&from, None, &to, None, u64::MAX)
             .map_io_err(|| format!("Failed to copy file: {:?}/{:?}", node.from, file_name))

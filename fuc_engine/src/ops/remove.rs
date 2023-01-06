@@ -91,7 +91,10 @@ mod compat {
     use rustix::fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir};
 
     use crate::{
-        ops::{compat::DirectoryOp, concat_cstrs, path_buf_to_cstring, IoErr, LazyCell},
+        ops::{
+            compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring, IoErr,
+            LazyCell,
+        },
         Error,
     };
 
@@ -213,9 +216,8 @@ mod compat {
                 } else {
                     unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
                         format!(
-                            "Failed to delete file: {:?}/{:?}",
-                            node.path,
-                            file.file_name()
+                            "Failed to delete file: {:?}",
+                            join_cstr_paths(&node.path, file.file_name())
                         )
                     })?;
                 }
