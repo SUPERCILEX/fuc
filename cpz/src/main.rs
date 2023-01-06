@@ -1,6 +1,12 @@
-#![allow(clippy::multiple_crate_versions)]
+#![feature(once_cell)]
+#![feature(let_chains)]
 
-use std::{borrow::Cow, fs, path::PathBuf};
+use std::{
+    borrow::Cow,
+    cell::LazyCell,
+    fs,
+    path::{PathBuf, MAIN_SEPARATOR},
+};
 
 use clap::{ArgAction, Parser, ValueHint};
 use clap2 as clap;
@@ -60,29 +66,40 @@ fn main() -> error_stack::Result<(), CliError> {
 }
 
 fn copy(args: Cpz) -> Result<(), Error> {
-    if args.from.len() > 1 {
+    let is_into_directory = LazyCell::new(|| args.to.to_string_lossy().ends_with(MAIN_SEPARATOR));
+    if args.from.len() > 1 || *is_into_directory {
         fs::create_dir_all(&args.to).map_err(|error| Error::Io {
             error,
             context: format!("Failed to create directory {:?}", args.to),
         })?;
+    }
 
+    if args.from.len() > 1 {
         CopyOp::builder()
             .files(args.from.into_iter().map(|path| {
-                let to = Cow::Owned(
-                    path.file_name()
-                        .map_or_else(|| args.to.clone(), |name| args.to.join(name)),
-                );
-                (Cow::Owned(path), to)
+                let to = path
+                    .file_name()
+                    .map_or_else(|| args.to.clone(), |name| args.to.join(name));
+                (Cow::Owned(path), Cow::Owned(to))
             }))
             .force(args.force)
             .build()
             .run()
     } else {
         CopyOp::builder()
-            .files([(
-                Cow::Owned(args.from.into_iter().next().unwrap()),
-                Cow::Owned(args.to),
-            )])
+            .files([{
+                let from = args.from.into_iter().next().unwrap();
+                let to = {
+                    let is_into_directory = *is_into_directory;
+                    let mut to = args.to;
+                    if is_into_directory && let Some(name) = from.file_name() {
+                        to.push(name);
+                    }
+                    to
+                };
+
+                (Cow::Owned(from), Cow::Owned(to))
+            }])
             .force(args.force)
             .build()
             .run()

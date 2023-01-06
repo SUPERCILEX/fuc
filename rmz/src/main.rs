@@ -1,5 +1,3 @@
-#![allow(clippy::multiple_crate_versions)]
-
 use std::{borrow::Cow, path::PathBuf};
 
 use clap::{ArgAction, Parser, ValueHint};

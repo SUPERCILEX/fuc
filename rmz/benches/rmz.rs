@@ -1,5 +1,3 @@
-#![allow(clippy::multiple_crate_versions)]
-
 use std::{fmt, fs::File, num::NonZeroU64, path::Path, time::Duration};
 
 use criterion::{
