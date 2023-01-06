@@ -145,7 +145,7 @@ mod compat {
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
 
-            for node in &tasks {
+            for message in &tasks {
                 if available_parallelism > 0 {
                     available_parallelism -= 1;
                     threads.push(scope.spawn({
@@ -154,7 +154,7 @@ mod compat {
                     }));
                 }
 
-                match node {
+                match message {
                     Message::Node(node) => delete_dir(node)?,
                     Message::Error(e) => return Err(e),
                 }
@@ -168,8 +168,8 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
-        for node in tasks {
-            match node {
+        for message in tasks {
+            match message {
                 Message::Node(node) => delete_dir(node)?,
                 Message::Error(e) => return Err(e),
             }
