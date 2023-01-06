@@ -106,9 +106,9 @@ mod compat {
         Error,
     };
 
-    struct Impl<LF: FnOnce() -> (Sender<Message>, JoinHandle<Result<(), Error>>)> {
+    struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
         #[allow(clippy::type_complexity)]
-        scheduling: LazyCell<(Sender<Message>, JoinHandle<Result<(), Error>>), LF>,
+        scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
     }
 
     pub fn copy_impl<'a>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'a, Path>)> {
@@ -120,18 +120,18 @@ mod compat {
         Impl { scheduling }
     }
 
-    impl<LF: FnOnce() -> (Sender<Message>, JoinHandle<Result<(), Error>>)>
+    impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)>
         DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl<LF>
     {
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
             let (tasks, _) = &*self.scheduling;
             tasks
-                .send(Message::Node(TreeNode {
+                .send(TreeNode {
                     from: path_buf_to_cstring(from.into_owned())?,
                     to: path_buf_to_cstring(to.into_owned())?,
                     messages: tasks.clone(),
                     root_to_inode: None,
-                }))
+                })
                 .map_err(|_| Error::Internal)
         }
 
@@ -145,7 +145,7 @@ mod compat {
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    fn root_worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+    fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
@@ -154,7 +154,7 @@ mod compat {
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
 
-            for message in &tasks {
+            for node in &tasks {
                 if available_parallelism > 0 {
                     available_parallelism -= 1;
                     threads.push(scope.spawn({
@@ -163,10 +163,7 @@ mod compat {
                     }));
                 }
 
-                match message {
-                    Message::Node(node) => copy_dir(node)?,
-                    Message::Copy(copy) => perform_actual_copy(copy)?,
-                }
+                copy_dir(node)?;
             }
 
             for thread in threads {
@@ -176,12 +173,9 @@ mod compat {
         })
     }
 
-    fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
-        for message in tasks {
-            match message {
-                Message::Node(node) => copy_dir(node)?,
-                Message::Copy(copy) => perform_actual_copy(copy)?,
-            }
+    fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+        for node in tasks {
+            copy_dir(node)?;
         }
         Ok(())
     }
@@ -220,12 +214,12 @@ mod compat {
 
                 if file.file_type() == FileType::Directory {
                     node.messages
-                        .send(Message::Node(TreeNode {
+                        .send(TreeNode {
                             from: concat_cstrs(&node.from, file.file_name()),
                             to: concat_cstrs(&node.to, file.file_name()),
                             messages: node.messages.clone(),
                             root_to_inode: node.root_to_inode,
-                        }))
+                        })
                         .map_err(|_| Error::Internal)?;
                 } else {
                     copy_one_file(&from_dir, &to_dir, file.file_name(), &node)?;
@@ -288,14 +282,13 @@ mod compat {
             )
         })?;
 
-        node.messages
-            .send(Message::Copy(Copy { from, to }))
-            .map_err(|_| Error::Internal)
-    }
-
-    fn perform_actual_copy(copy: Copy) -> Result<(), Error> {
-        copy_file_range(copy.from, None, copy.to, None, u64::MAX)
-            .map_io_err(|| "Failed to copy file".to_string())
+        copy_file_range(&from, None, &to, None, u64::MAX)
+            .map_io_err(|| {
+                format!(
+                    "Failed to copy file: {:?}",
+                    join_cstr_paths(&node.from, file_name)
+                )
+            })
             .map(|_| ())
     }
 
@@ -312,21 +305,11 @@ mod compat {
         })
     }
 
-    enum Message {
-        Node(TreeNode),
-        Copy(Copy),
-    }
-
     struct TreeNode {
         from: CString,
         to: CString,
-        messages: Sender<Message>,
+        messages: Sender<TreeNode>,
         root_to_inode: Option<u64>,
-    }
-
-    struct Copy {
-        from: OwnedFd,
-        to: OwnedFd,
     }
 }
 
