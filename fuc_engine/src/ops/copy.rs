@@ -46,7 +46,11 @@ fn schedule_copies<'a>(
     for (from, to) in files {
         if !force {
             match to.metadata() {
-                Ok(_) => return Err(Error::AlreadyExists),
+                Ok(_) => {
+                    return Err(Error::AlreadyExists {
+                        file: to.into_owned(),
+                    });
+                }
                 Err(e) if e.kind() == io::ErrorKind::NotFound => {
                     // Do nothing, this is good
                 }

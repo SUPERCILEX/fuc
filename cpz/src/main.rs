@@ -50,11 +50,11 @@ fn main() -> error_stack::Result<(), CliError> {
             Error::Io { error, context } => Report::from(error)
                 .attach_printable(context)
                 .change_context(wrapper),
-            Error::PreserveRoot
-            | Error::Join
-            | Error::BadPath
-            | Error::AlreadyExists
-            | Error::Internal => Report::from(wrapper),
+            Error::AlreadyExists { file: _ } => {
+                Report::from(wrapper).attach_printable("Use --force to overwrite.")
+            }
+            Error::Join | Error::BadPath | Error::Internal => Report::from(wrapper),
+            Error::PreserveRoot => unreachable!(),
         }
     })
 }

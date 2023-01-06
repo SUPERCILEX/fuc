@@ -1,6 +1,7 @@
 pub mod fuc_engine
 pub enum fuc_engine::Error
 pub fuc_engine::Error::AlreadyExists
+pub fuc_engine::Error::AlreadyExists::file: std::path::PathBuf
 pub fuc_engine::Error::BadPath
 pub fuc_engine::Error::Internal
 pub fuc_engine::Error::Io

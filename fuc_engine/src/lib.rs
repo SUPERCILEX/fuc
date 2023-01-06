@@ -4,7 +4,7 @@
 #![feature(once_cell)]
 #![allow(clippy::module_name_repetitions)]
 
-use std::io;
+use std::{io, path::PathBuf};
 
 use thiserror::Error;
 
@@ -14,16 +14,16 @@ mod ops;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("An IO error occurred.")]
+    #[error("An I/O error occurred")]
     Io { error: io::Error, context: String },
-    #[error("An attempt was made to delete `/`.")]
+    #[error("An attempt was made to delete `/`")]
     PreserveRoot,
-    #[error("Failed to join thread.")]
+    #[error("Failed to join thread")]
     Join,
-    #[error("Invalid file path.")]
+    #[error("Invalid file path")]
     BadPath,
-    #[error("File or directory already exists.")]
-    AlreadyExists,
-    #[error("An internal bug occurred, please report this.")]
+    #[error("File or directory already exists: {file:?}")]
+    AlreadyExists { file: PathBuf },
+    #[error("An internal bug occurred, please report this")]
     Internal,
 }
