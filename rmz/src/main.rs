@@ -54,6 +54,9 @@ fn main() -> Result<(), CliError> {
                 Error::Io { error, context } => Report::from(error)
                     .attach_printable(context)
                     .change_context(wrapper),
+                Error::NotFound { file: _ } => {
+                    Report::from(wrapper).attach_printable("Use --force to ignore.")
+                }
                 Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
                     Report::from(wrapper)
                 }

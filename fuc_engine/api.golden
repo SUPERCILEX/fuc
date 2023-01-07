@@ -8,6 +8,8 @@ pub fuc_engine::Error::Io
 pub fuc_engine::Error::Io::context: alloc::string::String
 pub fuc_engine::Error::Io::error: std::io::error::Error
 pub fuc_engine::Error::Join
+pub fuc_engine::Error::NotFound
+pub fuc_engine::Error::NotFound::file: std::path::PathBuf
 pub fuc_engine::Error::PreserveRoot
 impl core::fmt::Display for fuc_engine::Error
 pub fn fuc_engine::Error::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result

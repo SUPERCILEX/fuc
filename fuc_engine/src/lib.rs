@@ -24,6 +24,8 @@ pub enum Error {
     BadPath,
     #[error("File or directory already exists: {file:?}")]
     AlreadyExists { file: PathBuf },
+    #[error("File or directory not found: {file:?}")]
+    NotFound { file: PathBuf },
     #[error("An internal bug occurred, please report this")]
     Internal,
 }

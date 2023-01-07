@@ -60,7 +60,7 @@ fn main() -> error_stack::Result<(), CliError> {
                 Report::from(wrapper).attach_printable("Use --force to overwrite.")
             }
             Error::Join | Error::BadPath | Error::Internal => Report::from(wrapper),
-            Error::PreserveRoot => unreachable!(),
+            Error::PreserveRoot | Error::NotFound { file: _ } => unreachable!(),
         }
     })
 }

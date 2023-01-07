@@ -57,8 +57,14 @@ fn schedule_deletions<'a>(
             return Err(Error::PreserveRoot);
         }
         let is_dir = match file.metadata() {
-            Err(e) if force && e.kind() == io::ErrorKind::NotFound => {
-                continue;
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                if force {
+                    continue;
+                }
+
+                return Err(Error::NotFound {
+                    file: file.into_owned(),
+                });
             }
             r => r,
         }
