@@ -95,9 +95,12 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
-    use rustix::fs::{
-        copy_file_range, cwd, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
-        Mode, OFlags, RawDir, RawMode, StatxFlags,
+    use rustix::{
+        fs::{
+            copy_file_range, cwd, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
+            Mode, OFlags, RawDir, RawMode, StatxFlags,
+        },
+        io::Errno,
     };
 
     use crate::{
@@ -274,13 +277,18 @@ mod compat {
         let (from, to) = prep_regular_file(from_dir, to_dir, file_name, node)?;
         let mut total_copied = 0;
         loop {
-            let byte_copied = copy_file_range(&from, None, &to, None, u64::MAX - total_copied)
-                .map_io_err(|| {
+            let byte_copied = match copy_file_range(&from, None, &to, None, u64::MAX - total_copied)
+            {
+                Err(Errno::XDEV) if total_copied == 0 => {
+                    return _copy_any_file(from, to, file_name, node);
+                }
+                r => r.map_io_err(|| {
                     format!(
                         "Failed to copy file: {:?}",
                         join_cstr_paths(&node.from, file_name)
                     )
-                })?;
+                })?,
+            };
 
             if byte_copied == 0 {
                 return Ok(());
@@ -297,6 +305,16 @@ mod compat {
         node: &TreeNode,
     ) -> Result<(), Error> {
         let (from, to) = prep_regular_file(from_dir, to_dir, file_name, node)?;
+        _copy_any_file(from, to, file_name, node)
+    }
+
+    #[cold]
+    fn _copy_any_file(
+        from: OwnedFd,
+        to: OwnedFd,
+        file_name: &CStr,
+        node: &TreeNode,
+    ) -> Result<(), Error> {
         io::copy(&mut File::from(from), &mut File::from(to))
             .map_io_err(|| {
                 format!(
