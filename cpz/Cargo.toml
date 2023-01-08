@@ -22,7 +22,7 @@ memmap2 = "0.5.8"
 rand = "0.8.5"
 supercilex-tests = "0.2.1"
 tempfile = "3.3.0"
-trycmd = "0.14.8"
+trycmd = "0.14.10"
 
 [target.'cfg(unix)'.dev-dependencies]
 rustix = { version = "0.36.6", features = ["fs"] }

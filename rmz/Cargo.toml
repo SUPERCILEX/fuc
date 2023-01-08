@@ -19,7 +19,7 @@ thiserror = "1.0.38"
 criterion = "0.4.0"
 ftzz = "1.1.4"
 tempfile = "3.3.0"
-trycmd = "0.14.8"
+trycmd = "0.14.10"
 rayon_rm = { path = "../comparisons/rayon_rm" }
 og_crappy_rm = { path = "../comparisons/og_crappy_rm" }
 stdlib_rm = { path = "../comparisons/stdlib_rm" }
