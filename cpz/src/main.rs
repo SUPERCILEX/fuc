@@ -66,7 +66,21 @@ fn main() -> error_stack::Result<(), CliError> {
 }
 
 fn copy(args: Cpz) -> Result<(), Error> {
-    let is_into_directory = LazyCell::new(|| args.to.to_string_lossy().ends_with(MAIN_SEPARATOR));
+    #[allow(clippy::unnested_or_patterns)]
+    let is_into_directory = LazyCell::new(|| {
+        matches!(
+            {
+                let path_str = args.to.to_string_lossy();
+                let mut chars = path_str.chars();
+                (chars.next_back(), chars.next_back(), chars.next_back())
+            },
+            (Some(MAIN_SEPARATOR), _, _) // */
+                | (Some('.'), None, _) // .
+                | (Some('.'), Some(MAIN_SEPARATOR), _) // */.
+                | (Some('.'), Some('.'), None) // ..
+                | (Some('.'), Some('.'), Some(MAIN_SEPARATOR)) // */..
+        )
+    });
     if args.from.len() > 1 || *is_into_directory {
         fs::create_dir_all(&args.to).map_err(|error| Error::Io {
             error,
