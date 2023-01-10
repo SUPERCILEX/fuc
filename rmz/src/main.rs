@@ -2,7 +2,7 @@ use std::{borrow::Cow, path::PathBuf};
 
 use clap::{ArgAction, Parser, ValueHint};
 use clap2 as clap;
-use error_stack::{Report, Result};
+use error_stack::Report;
 use fuc_engine::{Error, RemoveOp};
 
 /// A zippy alternative to `rm`, a tool to remove files and directories
@@ -39,30 +39,40 @@ pub enum CliError {
     Wrapper(String),
 }
 
-fn main() -> Result<(), CliError> {
+fn main() -> error_stack::Result<(), CliError> {
     let args = Rmz::parse();
 
+    remove(args).map_err(|e| {
+        let wrapper = CliError::Wrapper(format!("{e}"));
+        match e {
+            Error::Io { error, context } => Report::from(error)
+                .attach_printable(context)
+                .change_context(wrapper),
+            Error::NotFound { file: _ } => {
+                Report::from(wrapper).attach_printable("Use --force to ignore.")
+            }
+            Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
+                Report::from(wrapper)
+            }
+            Error::AlreadyExists { file: _ } => unreachable!(),
+        }
+    })
+}
+
+fn remove(
+    Rmz {
+        files,
+        force,
+        preserve_root,
+        help: _,
+    }: Rmz,
+) -> Result<(), Error> {
     RemoveOp::builder()
-        .files(args.files.into_iter().map(Cow::Owned))
-        .force(args.force)
-        .preserve_root(args.preserve_root)
+        .files(files.into_iter().map(Cow::Owned))
+        .force(force)
+        .preserve_root(preserve_root)
         .build()
         .run()
-        .map_err(|e| {
-            let wrapper = CliError::Wrapper(format!("{e}"));
-            match e {
-                Error::Io { error, context } => Report::from(error)
-                    .attach_printable(context)
-                    .change_context(wrapper),
-                Error::NotFound { file: _ } => {
-                    Report::from(wrapper).attach_printable("Use --force to ignore.")
-                }
-                Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
-                    Report::from(wrapper)
-                }
-                Error::AlreadyExists { file: _ } => unreachable!(),
-            }
-        })
 }
 
 #[cfg(test)]

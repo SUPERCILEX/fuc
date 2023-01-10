@@ -65,12 +65,19 @@ fn main() -> error_stack::Result<(), CliError> {
     })
 }
 
-fn copy(args: Cpz) -> Result<(), Error> {
+fn copy(
+    Cpz {
+        from,
+        to,
+        force,
+        help: _,
+    }: Cpz,
+) -> Result<(), Error> {
     #[allow(clippy::unnested_or_patterns)]
     let is_into_directory = LazyCell::new(|| {
         matches!(
             {
-                let path_str = args.to.to_string_lossy();
+                let path_str = to.to_string_lossy();
                 let mut chars = path_str.chars();
                 (chars.next_back(), chars.next_back(), chars.next_back())
             },
@@ -81,31 +88,31 @@ fn copy(args: Cpz) -> Result<(), Error> {
                 | (Some('.'), Some('.'), Some(MAIN_SEPARATOR)) // */..
         )
     });
-    if args.from.len() > 1 || *is_into_directory {
-        fs::create_dir_all(&args.to).map_err(|error| Error::Io {
+    if from.len() > 1 || *is_into_directory {
+        fs::create_dir_all(&to).map_err(|error| Error::Io {
             error,
-            context: format!("Failed to create directory {:?}", args.to),
+            context: format!("Failed to create directory {to:?}"),
         })?;
     }
 
-    if args.from.len() > 1 {
+    if from.len() > 1 {
         CopyOp::builder()
-            .files(args.from.into_iter().map(|path| {
+            .files(from.into_iter().map(|path| {
                 let to = path
                     .file_name()
-                    .map_or_else(|| args.to.clone(), |name| args.to.join(name));
+                    .map_or_else(|| to.clone(), |name| to.join(name));
                 (Cow::Owned(path), Cow::Owned(to))
             }))
-            .force(args.force)
+            .force(force)
             .build()
             .run()
     } else {
         CopyOp::builder()
             .files([{
-                let from = args.from.into_iter().next().unwrap();
+                let from = from.into_iter().next().unwrap();
                 let to = {
                     let is_into_directory = *is_into_directory;
-                    let mut to = args.to;
+                    let mut to = to;
                     if is_into_directory && let Some(name) = from.file_name() {
                         to.push(name);
                     }
@@ -114,7 +121,7 @@ fn copy(args: Cpz) -> Result<(), Error> {
 
                 (Cow::Owned(from), Cow::Owned(to))
             }])
-            .force(args.force)
+            .force(force)
             .build()
             .run()
     }
