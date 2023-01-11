@@ -18,7 +18,8 @@ Benchmarks are available under the [`comparisons`](comparisons/) folder.
 
 ## Non-goals
 
-- Portability: FUCs are primarily targeted at modern Linux installations.
+- Portability: FUCs are primarily targeted at modern Linux installations. Support for other
+  platforms is provided on a best-efforts basis.
 - Compatibility: [coreutils](https://github.com/coreutils/coreutils) or
   its [Rust re-implementation](https://github.com/uutils/coreutils) will have the broadest and most
   stable set of options.

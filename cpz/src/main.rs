@@ -22,6 +22,11 @@ use fuc_engine::{CopyOp, Error};
 #[cfg_attr(test, command(help_expected = true))]
 struct Cpz {
     /// The file(s) or directory(ies) to be copied
+    ///
+    /// If multiple files are specified, they will be copied into the target
+    /// destination rather than to it. The same is true of directory names
+    /// (`foo/`, `.`, `..`): that is, `cpz a b/` places `a` inside `b` as
+    /// opposed to `cpz a b` which makes `b` become `a`.
     #[arg(required = true)]
     #[arg(value_hint = ValueHint::AnyPath)]
     from: Vec<PathBuf>,

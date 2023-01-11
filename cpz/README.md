@@ -48,6 +48,10 @@ Usage: cpz[EXE] [OPTIONS] <FROM>... <TO>
 Arguments:
   <FROM>...
           The file(s) or directory(ies) to be copied
+          
+          If multiple files are specified, they will be copied into the target destination rather
+          than to it. The same is true of directory names (`foo/`, `.`, `..`): that is, `cpz a b/`
+          places `a` inside `b` as opposed to `cpz a b` which makes `b` become `a`.
 
   <TO>
           The copy destination
