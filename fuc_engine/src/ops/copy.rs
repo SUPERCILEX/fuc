@@ -162,6 +162,7 @@ mod compat {
 
             {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+                let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
                     if available_parallelism > 0 {
                         available_parallelism -= 1;
@@ -171,7 +172,7 @@ mod compat {
                         }));
                     }
 
-                    copy_dir(node, &mut buf)?;
+                    copy_dir(node, &mut buf, &symlink_buf_cache)?;
                 }
             }
 
@@ -184,13 +185,18 @@ mod compat {
 
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+        let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(node, &mut buf)?;
+            copy_dir(node, &mut buf, &symlink_buf_cache)?;
         }
         Ok(())
     }
 
-    fn copy_dir(mut node: TreeNode, buf: &mut [MaybeUninit<u8>]) -> Result<(), Error> {
+    fn copy_dir(
+        mut node: TreeNode,
+        buf: &mut [MaybeUninit<u8>],
+        symlink_buf_cache: &Cell<Vec<u8>>,
+    ) -> Result<(), Error> {
         let from_dir = openat(
             cwd(),
             node.from.as_c_str(),
@@ -226,7 +232,14 @@ mod compat {
                     })
                     .map_err(|_| Error::Internal)?;
             } else {
-                copy_one_file(&from_dir, &to_dir, file.file_name(), file_type, &node)?;
+                copy_one_file(
+                    &from_dir,
+                    &to_dir,
+                    file.file_name(),
+                    file_type,
+                    &node,
+                    symlink_buf_cache,
+                )?;
             }
         }
         Ok(())
@@ -257,10 +270,11 @@ mod compat {
         file_name: &CStr,
         file_type: FileType,
         node: &TreeNode,
+        symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
         match file_type {
             FileType::RegularFile => copy_regular_file(from_dir, to_dir, file_name, node),
-            FileType::Symlink => copy_symlink(from_dir, to_dir, file_name, node),
+            FileType::Symlink => copy_symlink(from_dir, to_dir, file_name, node, symlink_buf_cache),
             _ => copy_any_file(from_dir, to_dir, file_name, node),
         }
     }
@@ -368,29 +382,25 @@ mod compat {
         to_dir: impl AsFd,
         file_name: &CStr,
         node: &TreeNode,
+        symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
-        thread_local! {
-            static BUF: Cell<Vec<u8>> = Cell::new(Vec::new());
-        }
-
-        BUF.with(|buf| {
-            let from_symlink = readlinkat(from_dir, file_name, buf.take()).map_io_err(|| {
+        let from_symlink =
+            readlinkat(from_dir, file_name, symlink_buf_cache.take()).map_io_err(|| {
                 format!(
                     "Failed to read symlink: {:?}",
                     join_cstr_paths(&node.from, file_name)
                 )
             })?;
 
-            symlinkat(from_symlink.as_c_str(), &to_dir, file_name).map_io_err(|| {
-                format!(
-                    "Failed to create symlink: {:?}",
-                    join_cstr_paths(&node.to, file_name)
-                )
-            })?;
+        symlinkat(from_symlink.as_c_str(), &to_dir, file_name).map_io_err(|| {
+            format!(
+                "Failed to create symlink: {:?}",
+                join_cstr_paths(&node.to, file_name)
+            )
+        })?;
 
-            buf.set(from_symlink.into_bytes_with_nul());
-            Ok(())
-        })
+        symlink_buf_cache.set(from_symlink.into_bytes_with_nul());
+        Ok(())
     }
 
     fn maybe_compute_root_to_inode(to_dir: impl AsFd, node: &mut TreeNode) -> Result<u64, Error> {
