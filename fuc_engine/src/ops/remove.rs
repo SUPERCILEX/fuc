@@ -87,11 +87,20 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 #[cfg(target_os = "linux")]
 mod compat {
     use std::{
-        borrow::Cow, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path, sync::Arc,
-        thread, thread::JoinHandle,
+        borrow::Cow,
+        ffi::CString,
+        io,
+        mem::MaybeUninit,
+        num::NonZeroUsize,
+        os::fd::{AsRawFd, RawFd},
+        path::Path,
+        sync::Arc,
+        thread,
+        thread::JoinHandle,
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use io_uring::{opcode::UnlinkAt, squeue::Flags, types::Fd, IoUring};
     use rustix::{
         fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
         thread::{unshare, UnshareFlags},
@@ -99,8 +108,7 @@ mod compat {
 
     use crate::{
         ops::{
-            compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
-            IoErr, LazyCell,
+            compat::DirectoryOp, concat_cstrs, get_file_type, path_buf_to_cstring, IoErr, LazyCell,
         },
         Error,
     };
@@ -146,6 +154,8 @@ mod compat {
         }
     }
 
+    const URING_ENTRIES: u16 = 128;
+
     fn root_worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
@@ -154,23 +164,32 @@ mod compat {
 
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
+            let mut io_uring = IoUring::builder()
+                .setup_coop_taskrun()
+                .setup_single_issuer()
+                .build(URING_ENTRIES.into())
+                .map_io_err(|| "Failed to create io_uring")?;
 
             {
+                let io_uring_fd = io_uring.as_raw_fd();
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+
                 for message in &tasks {
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                || worker_thread(tasks)
+                                move || worker_thread(tasks, io_uring_fd)
                             }));
                         }
                     };
                     maybe_spawn();
 
                     match message {
-                        Message::Node(node) => delete_dir(node, &mut buf, maybe_spawn)?,
+                        Message::Node(node) => {
+                            delete_dir(node, &mut buf, &mut io_uring, maybe_spawn)?;
+                        }
                         Message::Error(e) => return Err(e),
                     }
                 }
@@ -183,13 +202,19 @@ mod compat {
         })
     }
 
-    fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+    fn worker_thread(tasks: Receiver<Message>, io_uring_fd: RawFd) -> Result<(), Error> {
+        let mut io_uring = IoUring::builder()
+            .setup_attach_wq(io_uring_fd)
+            .setup_coop_taskrun()
+            .setup_single_issuer()
+            .build(URING_ENTRIES.into())
+            .map_io_err(|| "Failed to create io_uring")?;
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
-
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+
         for message in tasks {
             match message {
-                Message::Node(node) => delete_dir(node, &mut buf, || {})?,
+                Message::Node(node) => delete_dir(node, &mut buf, &mut io_uring, || {})?,
                 Message::Error(e) => return Err(e),
             }
         }
@@ -199,8 +224,28 @@ mod compat {
     fn delete_dir(
         node: TreeNode,
         buf: &mut [MaybeUninit<u8>],
+        io_uring: &mut IoUring,
         mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
+        fn flush_uring(io_uring: &mut IoUring, entries: usize) -> Result<(), Error> {
+            if entries == 0 {
+                return Ok(());
+            }
+
+            io_uring
+                .submit_and_wait(entries)
+                .map_io_err(|| "Failed to submit io_uring queue.")?;
+            for entry in io_uring.completion() {
+                if entry.result() != 0 {
+                    return Err(io::Error::from_raw_os_error(entry.result())).map_io_err(|| {
+                        // TODO need to pass index into user_data
+                        "Failed to delete file"
+                    });
+                }
+            }
+            Ok(())
+        }
+
         let dir = openat(
             cwd(),
             &node.path,
@@ -211,6 +256,7 @@ mod compat {
 
         let node = LazyCell::new(|| Arc::new(node));
         let mut raw_dir = RawDir::new(&dir, buf);
+        let mut pending = 0;
         while let Some(file) = raw_dir.next() {
             let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
             {
@@ -235,14 +281,25 @@ mod compat {
                     }))
                     .map_err(|_| Error::Internal)?;
             } else {
-                unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
-                    format!(
-                        "Failed to delete file: {:?}",
-                        join_cstr_paths(&node.path, file.file_name())
-                    )
-                })?;
+                unsafe {
+                    io_uring
+                        .submission()
+                        .push(
+                            &UnlinkAt::new(Fd(dir.as_raw_fd()), file.file_name().as_ptr())
+                                .build()
+                                .flags(Flags::IO_LINK),
+                        )
+                        .map_err(|_| Error::Internal)?;
+                }
+                pending += 1;
+            }
+
+            if raw_dir.is_buffer_empty() || pending == usize::from(URING_ENTRIES) {
+                flush_uring(io_uring, pending)?;
+                pending = 0;
             }
         }
+        flush_uring(io_uring, pending)?;
         Ok(())
     }
 
