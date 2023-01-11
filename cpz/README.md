@@ -12,7 +12,7 @@ Binaries for a number of platforms are available on the
 ### Build from source
 
 ```console,ignore
-$ cargo install cpz
+$ cargo +nightly install cpz
 ```
 
 ## Usage
