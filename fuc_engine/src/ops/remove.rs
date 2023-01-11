@@ -84,8 +84,8 @@ fn schedule_deletions<'a>(
 mod compat {
     use std::{
         borrow::Cow,
-        cell::RefCell,
         ffi::{CStr, CString},
+        mem::MaybeUninit,
         num::NonZeroUsize,
         path::Path,
         sync::Arc,
@@ -151,18 +151,21 @@ mod compat {
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
 
-            for message in &tasks {
-                if available_parallelism > 0 {
-                    available_parallelism -= 1;
-                    threads.push(scope.spawn({
-                        let tasks = tasks.clone();
-                        || worker_thread(tasks)
-                    }));
-                }
+            {
+                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+                for message in &tasks {
+                    if available_parallelism > 0 {
+                        available_parallelism -= 1;
+                        threads.push(scope.spawn({
+                            let tasks = tasks.clone();
+                            || worker_thread(tasks)
+                        }));
+                    }
 
-                match message {
-                    Message::Node(node) => delete_dir(node)?,
-                    Message::Error(e) => return Err(e),
+                    match message {
+                        Message::Node(node) => delete_dir(node, &mut buf)?,
+                        Message::Error(e) => return Err(e),
+                    }
                 }
             }
 
@@ -174,62 +177,55 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
             match message {
-                Message::Node(node) => delete_dir(node)?,
+                Message::Node(node) => delete_dir(node, &mut buf)?,
                 Message::Error(e) => return Err(e),
             }
         }
         Ok(())
     }
 
-    fn delete_dir(node: TreeNode) -> Result<(), Error> {
-        thread_local! {
-            static BUF: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(8192));
-        }
+    fn delete_dir(node: TreeNode, buf: &mut [MaybeUninit<u8>]) -> Result<(), Error> {
+        let dir = openat(
+            cwd(),
+            node.path.as_c_str(),
+            OFlags::RDONLY | OFlags::DIRECTORY,
+            Mode::empty(),
+        )
+        .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
 
-        BUF.with(|buf| {
-            let dir = openat(
-                cwd(),
-                node.path.as_c_str(),
-                OFlags::RDONLY | OFlags::DIRECTORY,
-                Mode::empty(),
-            )
-            .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
+        let node = LazyCell::new(|| Arc::new(node));
+        let mut raw_dir = RawDir::new(&dir, buf);
+        while let Some(file) = raw_dir.next() {
+            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+            const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
+            const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
-            let node = LazyCell::new(|| Arc::new(node));
-            let mut buf = buf.borrow_mut();
-            let mut raw_dir = RawDir::new(&dir, buf.spare_capacity_mut());
-            while let Some(file) = raw_dir.next() {
-                // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-                const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
-                const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
-
-                let file =
-                    file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
-                if file.file_name() == DOT || file.file_name() == DOT_DOT {
-                    continue;
-                }
-
-                if file.file_type() == FileType::Directory {
-                    node.messages
-                        .send(Message::Node(TreeNode {
-                            path: concat_cstrs(&node.path, file.file_name()),
-                            _parent: Some(node.clone()),
-                            messages: node.messages.clone(),
-                        }))
-                        .map_err(|_| Error::Internal)?;
-                } else {
-                    unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
-                        format!(
-                            "Failed to delete file: {:?}",
-                            join_cstr_paths(&node.path, file.file_name())
-                        )
-                    })?;
-                }
+            let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
+            if file.file_name() == DOT || file.file_name() == DOT_DOT {
+                continue;
             }
-            Ok(())
-        })
+
+            if file.file_type() == FileType::Directory {
+                node.messages
+                    .send(Message::Node(TreeNode {
+                        path: concat_cstrs(&node.path, file.file_name()),
+                        _parent: Some(node.clone()),
+                        messages: node.messages.clone(),
+                    }))
+                    .map_err(|_| Error::Internal)?;
+            } else {
+                unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
+                    format!(
+                        "Failed to delete file: {:?}",
+                        join_cstr_paths(&node.path, file.file_name())
+                    )
+                })?;
+            }
+        }
+        Ok(())
     }
 
     enum Message {

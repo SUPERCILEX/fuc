@@ -83,10 +83,11 @@ fn schedule_copies<'a>(
 mod compat {
     use std::{
         borrow::Cow,
-        cell::{Cell, RefCell},
+        cell::Cell,
         ffi::{CStr, CString},
         fs::File,
         io,
+        mem::MaybeUninit,
         num::NonZeroUsize,
         os::fd::{AsFd, OwnedFd},
         path::Path,
@@ -159,16 +160,19 @@ mod compat {
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
 
-            for node in &tasks {
-                if available_parallelism > 0 {
-                    available_parallelism -= 1;
-                    threads.push(scope.spawn({
-                        let tasks = tasks.clone();
-                        || worker_thread(tasks)
-                    }));
-                }
+            {
+                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+                for node in &tasks {
+                    if available_parallelism > 0 {
+                        available_parallelism -= 1;
+                        threads.push(scope.spawn({
+                            let tasks = tasks.clone();
+                            || worker_thread(tasks)
+                        }));
+                    }
 
-                copy_dir(node)?;
+                    copy_dir(node, &mut buf)?;
+                }
             }
 
             for thread in threads {
@@ -179,60 +183,53 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for node in tasks {
-            copy_dir(node)?;
+            copy_dir(node, &mut buf)?;
         }
         Ok(())
     }
 
-    fn copy_dir(mut node: TreeNode) -> Result<(), Error> {
-        thread_local! {
-            static BUF: RefCell<Vec<u8>> = RefCell::new(Vec::with_capacity(8192));
-        }
+    fn copy_dir(mut node: TreeNode, buf: &mut [MaybeUninit<u8>]) -> Result<(), Error> {
+        let from_dir = openat(
+            cwd(),
+            node.from.as_c_str(),
+            OFlags::RDONLY | OFlags::DIRECTORY,
+            Mode::empty(),
+        )
+        .map_io_err(|| format!("Failed to open directory: {:?}", node.from))?;
+        let to_dir = copy_one_dir(&from_dir, &node)?;
+        let root_to_inode = maybe_compute_root_to_inode(&to_dir, &mut node)?;
 
-        BUF.with(|buf| {
-            let from_dir = openat(
-                cwd(),
-                node.from.as_c_str(),
-                OFlags::RDONLY | OFlags::DIRECTORY,
-                Mode::empty(),
-            )
-            .map_io_err(|| format!("Failed to open directory: {:?}", node.from))?;
-            let to_dir = copy_one_dir(&from_dir, &node)?;
-            let root_to_inode = maybe_compute_root_to_inode(&to_dir, &mut node)?;
+        let mut raw_dir = RawDir::new(&from_dir, buf);
+        while let Some(file) = raw_dir.next() {
+            const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
+            const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
-            let mut buf = buf.borrow_mut();
-            let mut raw_dir = RawDir::new(&from_dir, buf.spare_capacity_mut());
-            while let Some(file) = raw_dir.next() {
-                const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
-                const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
-
-                let file =
-                    file.map_io_err(|| format!("Failed to read directory: {:?}", node.from))?;
-                if file.file_name() == DOT || file.file_name() == DOT_DOT {
-                    continue;
-                }
-                if file.ino() == root_to_inode {
-                    // Block recursive descent from parent into child (e.g. cp parent parent/child).
-                    continue;
-                }
-
-                let file_type = file.file_type();
-                if file_type == FileType::Directory {
-                    node.messages
-                        .send(TreeNode {
-                            from: concat_cstrs(&node.from, file.file_name()),
-                            to: concat_cstrs(&node.to, file.file_name()),
-                            messages: node.messages.clone(),
-                            root_to_inode: node.root_to_inode,
-                        })
-                        .map_err(|_| Error::Internal)?;
-                } else {
-                    copy_one_file(&from_dir, &to_dir, file.file_name(), file_type, &node)?;
-                }
+            let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.from))?;
+            if file.file_name() == DOT || file.file_name() == DOT_DOT {
+                continue;
             }
-            Ok(())
-        })
+            if file.ino() == root_to_inode {
+                // Block recursive descent from parent into child (e.g. cp parent parent/child).
+                continue;
+            }
+
+            let file_type = file.file_type();
+            if file_type == FileType::Directory {
+                node.messages
+                    .send(TreeNode {
+                        from: concat_cstrs(&node.from, file.file_name()),
+                        to: concat_cstrs(&node.to, file.file_name()),
+                        messages: node.messages.clone(),
+                        root_to_inode: node.root_to_inode,
+                    })
+                    .map_err(|_| Error::Internal)?;
+            } else {
+                copy_one_file(&from_dir, &to_dir, file.file_name(), file_type, &node)?;
+            }
+        }
+        Ok(())
     }
 
     fn copy_one_dir(from_dir: impl AsFd, node: &TreeNode) -> Result<OwnedFd, Error> {
