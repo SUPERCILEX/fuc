@@ -1,6 +1,6 @@
 # rm zippy
 
-A zippy alternative to `rm`, a tool to remove files or directories.
+A zippy alternative to `rm`, a tool to remove files and directories.
 
 ## Installation
 

@@ -1,6 +1,6 @@
 # cp zippy
 
-A zippy alternative to `cp`, a tool to remove files or directories.
+A zippy alternative to `cp`, a tool to copy files and directories.
 
 ## Installation
 
