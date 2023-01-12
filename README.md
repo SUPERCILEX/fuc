@@ -9,6 +9,12 @@ Benchmarks are available under the [`comparisons`](comparisons/) folder.
 - [`rmz`](rmz)
 - [`cpz`](cpz)
 
+## Installation
+
+```
+cargo binstall rmz cpz
+```
+
 ## Goals
 
 1. Performance: if a reasonable improvement can be made, it will be.
