@@ -56,7 +56,7 @@ fn schedule_deletions<'a>(
         if preserve_root && file == Path::new("/") {
             return Err(Error::PreserveRoot);
         }
-        let is_dir = match file.metadata() {
+        let is_dir = match file.symlink_metadata() {
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 if force {
                     continue;

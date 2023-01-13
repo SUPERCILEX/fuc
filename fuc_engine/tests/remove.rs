@@ -26,7 +26,7 @@ fn non_existent_file_no_force() {
         .unwrap_err();
 
     assert!(!file.exists());
-    assert!(root.as_ref().exists());
+    assert!(root.path().exists());
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn non_existent_file_force() {
         .unwrap();
 
     assert!(!file.exists());
-    assert!(root.as_ref().exists());
+    assert!(root.path().exists());
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn one_file() {
     fuc_engine::remove_file(&file).unwrap();
 
     assert!(!file.exists());
-    assert!(root.as_ref().exists());
+    assert!(root.path().exists());
 }
 
 #[test]
@@ -68,7 +68,37 @@ fn one_dir() {
     fuc_engine::remove_file(&dir).unwrap();
 
     assert!(!dir.exists());
-    assert!(root.as_ref().exists());
+    assert!(root.path().exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn symbolic_link_delete_dir() {
+    let root = tempdir().unwrap();
+    let dir = root.path().join("dir");
+    fs::create_dir(&dir).unwrap();
+    let file = dir.join("file");
+    std::os::unix::fs::symlink("..", &file).unwrap();
+    assert!(file.exists());
+
+    fuc_engine::remove_file(&dir).unwrap();
+
+    assert!(!file.exists());
+    assert!(root.path().exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn symbolic_link_delete_link() {
+    let root = tempdir().unwrap();
+    let file = root.path().join("file");
+    std::os::unix::fs::symlink("..", &file).unwrap();
+    assert!(file.exists());
+
+    fuc_engine::remove_file(&file).unwrap();
+
+    assert!(!file.exists());
+    assert!(root.path().exists());
 }
 
 #[rstest]
@@ -87,5 +117,5 @@ fn uniform(#[values(1_000, 100_000)] num_files: u64) {
     fuc_engine::remove_file(&dir).unwrap();
 
     assert!(!dir.exists());
-    assert!(root.as_ref().exists());
+    assert!(root.path().exists());
 }
