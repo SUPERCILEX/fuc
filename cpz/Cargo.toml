@@ -12,7 +12,7 @@ license.workspace = true
 [dependencies]
 clap2 = { version = "4.0.32", features = ["derive", "wrap_help"] }
 error-stack = "0.2.4"
-fuc_engine = { version = "1.1.1", path = "../fuc_engine" }
+fuc_engine = { version = "1.1.2", path = "../fuc_engine" }
 thiserror = "1.0.38"
 
 [dev-dependencies]
