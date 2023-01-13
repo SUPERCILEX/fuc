@@ -252,7 +252,7 @@ mod compat {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(not(target_os = "linux"), not(target_os = "windows")))]
 mod compat {
     use std::{borrow::Cow, fs, io, path::Path};
 
@@ -296,7 +296,7 @@ mod compat {
     }
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(target_os = "windows")]
 mod compat {
     use std::{borrow::Cow, path::Path};
 
