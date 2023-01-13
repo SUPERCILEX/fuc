@@ -78,7 +78,7 @@ fn symbolic_link_delete_dir() {
     let dir = root.path().join("dir");
     fs::create_dir(&dir).unwrap();
     let file = dir.join("file");
-    std::os::unix::fs::symlink("..", &file).unwrap();
+    std::os::unix::fs::symlink(".", &file).unwrap();
     assert!(file.exists());
 
     fuc_engine::remove_file(&dir).unwrap();
@@ -92,7 +92,7 @@ fn symbolic_link_delete_dir() {
 fn symbolic_link_delete_link() {
     let root = tempdir().unwrap();
     let file = root.path().join("file");
-    std::os::unix::fs::symlink("..", &file).unwrap();
+    std::os::unix::fs::symlink(".", &file).unwrap();
     assert!(file.exists());
 
     fuc_engine::remove_file(&file).unwrap();

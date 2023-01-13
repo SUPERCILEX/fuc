@@ -482,16 +482,24 @@ mod compat {
                 }
 
                 let to = to.join(dir_entry.file_name());
-                if dir_entry.file_type()?.is_dir() {
-                    copy_dir(
-                        dir_entry.path(),
-                        to,
-                        #[cfg(unix)]
-                        root_to_inode,
-                    )?;
+                let file_type = dir_entry.file_type()?;
+
+                #[cfg(unix)]
+                if file_type.is_dir() {
+                    copy_dir(dir_entry.path(), to, root_to_inode)?;
+                } else if file_type.is_symlink() {
+                    std::os::unix::fs::symlink(dir_entry.path(), to)?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }
+
+                #[cfg(not(unix))]
+                if file_type.is_dir() {
+                    copy_dir(dir_entry.path(), to)?;
+                } else {
+                    fs::copy(dir_entry.path(), to)?;
+                }
+
                 Ok(())
             })
     }

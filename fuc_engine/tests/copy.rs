@@ -5,15 +5,13 @@ use tempfile::tempdir;
 #[test]
 fn pre_existing_file_no_force() {
     let root = tempdir().unwrap();
-    let file1 = root.path().join("file1");
-    File::create(&file1).unwrap();
-    assert!(file1.exists());
-    let file2 = root.path().join("file2");
-    File::create(&file2).unwrap();
-    assert!(file2.exists());
+    let from = root.path().join("from");
+    File::create(&from).unwrap();
+    let to = root.path().join("to");
+    File::create(&to).unwrap();
 
     fuc_engine::CopyOp::builder()
-        .files([(Cow::Owned(file1), Cow::Owned(file2))])
+        .files([(Cow::Owned(from), Cow::Owned(to))])
         .force(false)
         .build()
         .run()
@@ -23,15 +21,13 @@ fn pre_existing_file_no_force() {
 #[test]
 fn pre_existing_file_force() {
     let root = tempdir().unwrap();
-    let file1 = root.path().join("file1");
-    File::create(&file1).unwrap();
-    assert!(file1.exists());
-    let file2 = root.path().join("file2");
-    File::create(&file2).unwrap();
-    assert!(file2.exists());
+    let from = root.path().join("from");
+    File::create(&from).unwrap();
+    let to = root.path().join("to");
+    File::create(&to).unwrap();
 
     fuc_engine::CopyOp::builder()
-        .files([(Cow::Owned(file1), Cow::Owned(file2))])
+        .files([(Cow::Owned(from), Cow::Owned(to))])
         .force(true)
         .build()
         .run()
@@ -42,60 +38,85 @@ fn pre_existing_file_force() {
 #[cfg(unix)]
 fn self_nested() {
     let root = tempdir().unwrap();
-    let dir1 = root.path().join("dir1");
-    fs::create_dir(&dir1).unwrap();
-    let dir2 = root.path().join("dir1/dir2");
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    let to = root.path().join("from/to");
 
     fuc_engine::CopyOp::builder()
-        .files([(Cow::Owned(dir1), Cow::Borrowed(dir2.as_path()))])
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
         .force(true)
         .build()
         .run()
         .unwrap();
 
-    assert!(dir2.exists());
+    assert!(to.exists());
 }
 
 #[test]
 fn non_existent_parent_dir() {
     let root = tempdir().unwrap();
-    let dir1 = root.path().join("dir1");
-    fs::create_dir(&dir1).unwrap();
-    let dir2 = root.path().join("a/b/c/dir2");
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    let to = root.path().join("a/b/c/to");
 
     fuc_engine::CopyOp::builder()
-        .files([(Cow::Owned(dir1), Cow::Borrowed(dir2.as_path()))])
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
         .force(true)
         .build()
         .run()
         .unwrap();
 
-    assert!(dir2.exists());
+    assert!(to.exists());
 }
 
 #[test]
 fn one_file() {
     let root = tempdir().unwrap();
-    let file1 = root.path().join("file1");
-    File::create(&file1).unwrap();
-    assert!(file1.exists());
-    let file2 = root.path().join("file2");
+    let from = root.path().join("from");
+    File::create(&from).unwrap();
+    let to = root.path().join("to");
 
-    fuc_engine::copy_file(&file1, &file2).unwrap();
+    fuc_engine::copy_file(&from, &to).unwrap();
 
-    assert!(file2.exists());
+    assert!(to.exists());
 }
 
 #[test]
 fn one_dir() {
     let root = tempdir().unwrap();
-    let dir1 = root.path().join("dir1");
-    fs::create_dir(&dir1).unwrap();
-    assert!(dir1.exists());
-    File::create(dir1.join("file")).unwrap();
-    let dir2 = root.path().join("dir2");
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    File::create(from.join("file")).unwrap();
+    let to = root.path().join("to");
 
-    fuc_engine::copy_file(&dir1, &dir2).unwrap();
+    fuc_engine::copy_file(&from, &to).unwrap();
 
-    assert!(dir2.exists());
+    assert!(to.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn symbolic_link_copy_dir() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("dir");
+    fs::create_dir(&from).unwrap();
+    std::os::unix::fs::symlink(".", from.join("file")).unwrap();
+    let to = root.path().join("to");
+
+    fuc_engine::copy_file(&from, &to).unwrap();
+
+    assert!(to.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn symbolic_link_copy_link() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    std::os::unix::fs::symlink(".", &from).unwrap();
+    let to = root.path().join("to");
+
+    fuc_engine::copy_file(&from, &to).unwrap();
+
+    assert!(to.exists());
 }
