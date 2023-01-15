@@ -45,7 +45,7 @@ fn schedule_copies<'a>(
 ) -> Result<(), Error> {
     for (from, to) in files {
         if !force {
-            match to.metadata() {
+            match to.symlink_metadata() {
                 Ok(_) => {
                     return Err(Error::AlreadyExists {
                         file: to.into_owned(),
@@ -60,17 +60,27 @@ fn schedule_copies<'a>(
             }
         }
 
-        let is_dir = from
-            .metadata()
-            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?
-            .is_dir();
+        let from_metadata = from
+            .symlink_metadata()
+            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
 
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent)
                 .map_io_err(|| format!("Failed to create parent directory: {parent:?}"))?;
         }
 
-        if is_dir {
+        #[cfg(unix)]
+        if from_metadata.is_dir() {
+            copy.run((from, to))?;
+        } else if from_metadata.is_symlink() {
+            std::os::unix::fs::symlink(&from, &to)
+                .map_io_err(|| format!("Failed to create symlink: {to:?}"))?;
+        } else {
+            fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
+        }
+
+        #[cfg(not(unix))]
+        if from_metadata.is_dir() {
             copy.run((from, to))?;
         } else {
             fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
