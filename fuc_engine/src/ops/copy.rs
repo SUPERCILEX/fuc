@@ -116,8 +116,8 @@ mod compat {
 
     use crate::{
         ops::{
-            compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring, IoErr,
-            LazyCell,
+            compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
+            IoErr, LazyCell,
         },
         Error,
     };
@@ -231,7 +231,10 @@ mod compat {
                 continue;
             }
 
-            let file_type = file.file_type();
+            let file_type = match file.file_type() {
+                FileType::Unknown => get_file_type(&from_dir, file.file_name(), &node.from)?,
+                t => t,
+            };
             if file_type == FileType::Directory {
                 node.messages
                     .send(TreeNode {
