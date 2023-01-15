@@ -87,6 +87,7 @@ mod compat {
         ffi::{CStr, CString},
         mem::MaybeUninit,
         num::NonZeroUsize,
+        os::fd::AsFd,
         path::Path,
         sync::Arc,
         thread,
@@ -94,7 +95,9 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
-    use rustix::fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir};
+    use rustix::fs::{
+        cwd, openat, statx, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir, RawMode, StatxFlags,
+    };
 
     use crate::{
         ops::{
@@ -208,7 +211,11 @@ mod compat {
                 continue;
             }
 
-            if file.file_type() == FileType::Directory {
+            let file_type = match file.file_type() {
+                FileType::Unknown => get_file_type(&dir, file.file_name(), &node)?,
+                t => t,
+            };
+            if file_type == FileType::Directory {
                 node.messages
                     .send(Message::Node(TreeNode {
                         path: concat_cstrs(&node.path, file.file_name()),
@@ -226,6 +233,18 @@ mod compat {
             }
         }
         Ok(())
+    }
+
+    #[cold]
+    fn get_file_type(dir: impl AsFd, file_name: &CStr, node: &TreeNode) -> Result<FileType, Error> {
+        statx(dir, file_name, AtFlags::SYMLINK_NOFOLLOW, StatxFlags::TYPE)
+            .map_io_err(|| {
+                format!(
+                    "Failed to stat file: {:?}",
+                    join_cstr_paths(&node.path, file_name)
+                )
+            })
+            .map(|metadata| FileType::from_raw_mode(RawMode::from(metadata.stx_mode)))
     }
 
     enum Message {
