@@ -73,7 +73,9 @@ fn schedule_copies<'a>(
         if from_metadata.is_dir() {
             copy.run((from, to))?;
         } else if from_metadata.is_symlink() {
-            std::os::unix::fs::symlink(&from, &to)
+            let link =
+                fs::read_link(&from).map_io_err(|| format!("Failed to read symlink: {from:?}"))?;
+            std::os::unix::fs::symlink(link, &to)
                 .map_io_err(|| format!("Failed to create symlink: {to:?}"))?;
         } else {
             fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
@@ -501,7 +503,7 @@ mod compat {
                 if file_type.is_dir() {
                     copy_dir(dir_entry.path(), to, root_to_inode)?;
                 } else if file_type.is_symlink() {
-                    std::os::unix::fs::symlink(dir_entry.path(), to)?;
+                    std::os::unix::fs::symlink(fs::read_link(dir_entry.path())?, to)?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }
