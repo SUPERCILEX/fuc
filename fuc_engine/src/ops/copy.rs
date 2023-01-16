@@ -279,6 +279,7 @@ mod compat {
         .map_io_err(|| format!("Failed to open directory: {:?}", node.to))
     }
 
+    #[allow(clippy::similar_names)]
     fn copy_one_file(
         from_dir: impl AsFd,
         to_dir: impl AsFd,
@@ -287,26 +288,53 @@ mod compat {
         node: &TreeNode,
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
-        match file_type {
-            FileType::RegularFile => copy_regular_file(from_dir, to_dir, file_name, node),
-            FileType::Symlink => copy_symlink(from_dir, to_dir, file_name, node, symlink_buf_cache),
-            _ => copy_any_file(from_dir, to_dir, file_name, node),
+        if file_type == FileType::Symlink {
+            copy_symlink(from_dir, to_dir, file_name, node, symlink_buf_cache)
+        } else {
+            // Some files systems are super dumb and lie about their symlinks, claiming they
+            // are regular files. Since we need to make a stat call anyway (for perms), grab
+            // the type too and use that to check again if the file is a symlink.
+            let (file_type, from_mode) = {
+                let from_metadata = statx(
+                    &from_dir,
+                    file_name,
+                    AtFlags::empty(),
+                    StatxFlags::TYPE | StatxFlags::MODE,
+                )
+                .map_io_err(|| {
+                    format!(
+                        "Failed to stat file: {:?}",
+                        join_cstr_paths(&node.from, file_name)
+                    )
+                })?;
+
+                let mode = RawMode::from(from_metadata.stx_mode);
+                (FileType::from_raw_mode(mode), Mode::from_raw_mode(mode))
+            };
+
+            let (from, to) = prep_regular_file(&from_dir, &to_dir, file_name, from_mode, node)?;
+            match file_type {
+                FileType::RegularFile => copy_regular_file(from, to, file_name, node),
+                FileType::Symlink => {
+                    copy_symlink(from_dir, to_dir, file_name, node, symlink_buf_cache)
+                }
+                _ => copy_any_file(from, to, file_name, node),
+            }
         }
     }
 
     fn copy_regular_file(
-        from_dir: impl AsFd,
-        to_dir: impl AsFd,
+        from: OwnedFd,
+        to: OwnedFd,
         file_name: &CStr,
         node: &TreeNode,
     ) -> Result<(), Error> {
-        let (from, to) = prep_regular_file(from_dir, to_dir, file_name, node)?;
         let mut total_copied = 0;
         loop {
             let byte_copied = match copy_file_range(&from, None, &to, None, u64::MAX - total_copied)
             {
                 Err(Errno::XDEV) if total_copied == 0 => {
-                    return _copy_any_file(from, to, file_name, node);
+                    return copy_any_file(from, to, file_name, node);
                 }
                 r => r.map_io_err(|| {
                     format!(
@@ -325,17 +353,6 @@ mod compat {
 
     #[cold]
     fn copy_any_file(
-        from_dir: impl AsFd,
-        to_dir: impl AsFd,
-        file_name: &CStr,
-        node: &TreeNode,
-    ) -> Result<(), Error> {
-        let (from, to) = prep_regular_file(from_dir, to_dir, file_name, node)?;
-        _copy_any_file(from, to, file_name, node)
-    }
-
-    #[cold]
-    fn _copy_any_file(
         from: OwnedFd,
         to: OwnedFd,
         file_name: &CStr,
@@ -355,6 +372,7 @@ mod compat {
         from_dir: impl AsFd,
         to_dir: impl AsFd,
         file_name: &CStr,
+        from_mode: Mode,
         node: &TreeNode,
     ) -> Result<(OwnedFd, OwnedFd), Error> {
         let from =
@@ -364,16 +382,6 @@ mod compat {
                     join_cstr_paths(&node.from, file_name)
                 )
             })?;
-        let from_mode = {
-            let from_metadata = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
-                .map_io_err(|| {
-                    format!(
-                        "Failed to stat file: {:?}",
-                        join_cstr_paths(&node.from, file_name)
-                    )
-                })?;
-            Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
-        };
 
         let to = openat(
             &to_dir,
