@@ -212,7 +212,7 @@ mod compat {
         let from_dir = openat(
             cwd(),
             node.from.as_c_str(),
-            OFlags::RDONLY | OFlags::DIRECTORY,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.from))?;
