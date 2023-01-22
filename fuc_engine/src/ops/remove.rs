@@ -154,7 +154,7 @@ mod compat {
             {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 for message in &tasks {
-                    if available_parallelism > 0 {
+                    if available_parallelism > 0 && !tasks.is_empty() {
                         available_parallelism -= 1;
                         threads.push(scope.spawn({
                             let tasks = tasks.clone();
