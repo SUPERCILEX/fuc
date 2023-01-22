@@ -9,6 +9,7 @@ members = [
     "comparisons/rm_rayon",
     "comparisons/rm_remove_dir_all",
     "comparisons/rm_stdlib",
+    "comparisons/tools",
 ]
 
 [workspace.package]

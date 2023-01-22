@@ -29,6 +29,7 @@ for num_bytes in {0,100M}; do
         "rsync --delete -r /tmp/empty/ /tmp/ftzz" \
         "./target/release/rm_stdlib /tmp/ftzz" \
         "./target/release/rm_rayon /tmp/ftzz" \
+        "./target/release/rm_remove_dir_all /tmp/ftzz" \
         "./target/release/rmz /tmp/ftzz"
   done
 
@@ -42,6 +43,7 @@ for num_bytes in {0,100M}; do
       "perl -e 'for(</tmp/ftzz/*>){unlink}'" \
       "./target/release/rm_stdlib /tmp/ftzz" \
       "./target/release/rm_rayon /tmp/ftzz" \
+      "./target/release/rm_remove_dir_all /tmp/ftzz" \
       "./target/release/rmz /tmp/ftzz"
 
   hyperfine --warmup 3 -N \
@@ -53,145 +55,158 @@ for num_bytes in {0,100M}; do
       "rsync --delete -r /tmp/empty/ /tmp/ftzz" \
       "./target/release/rm_stdlib /tmp/ftzz" \
       "./target/release/rm_rayon /tmp/ftzz" \
+      "./target/release/rm_remove_dir_all /tmp/ftzz" \
       "./target/release/rmz /tmp/ftzz"
 done
 ```
 
 ### Results
 
-#### `remove_10_files_0_bytes.md`
-
-| Command                                   |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
-|:------------------------------------------|-----------:|---------:|---------:|----------:|------------:|-------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  1.1 ± 0.1 |      1.0 |      1.4 |       0.6 |         1.4 |         1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     |  1.4 ± 0.3 |      1.2 |      3.5 |       1.0 |         2.8 |  1.33 ± 0.26 |
-| `./target/release/stdlib_rm /tmp/ftzz`    |  2.7 ± 0.0 |      2.6 |      2.9 |       0.6 |         1.9 |  2.49 ± 0.14 |
-| `rm -r /tmp/ftzz`                         |  3.5 ± 0.1 |      3.4 |      3.7 |       1.0 |         2.4 |  3.26 ± 0.19 |
-| `find /tmp/ftzz -delete`                  |  4.4 ± 0.1 |      4.2 |      4.6 |       1.1 |         2.7 |  4.07 ± 0.24 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 48.9 ± 0.1 |     48.7 |     49.1 |       3.6 |         6.0 | 45.49 ± 2.51 |
-
-#### `remove_10_000_files_0_bytes.md`
-
-| Command                                   |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  44.5 ± 1.8 |     42.4 |     49.7 |      10.5 |       207.3 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     |  54.0 ± 1.7 |     52.0 |     58.5 |      24.7 |       218.6 | 1.22 ± 0.06 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 106.4 ± 0.9 |    104.9 |    108.1 |      10.0 |        94.2 | 2.39 ± 0.10 |
-| `find /tmp/ftzz -delete`                  | 116.8 ± 1.3 |    115.1 |    120.9 |      15.8 |        98.2 | 2.63 ± 0.11 |
-| `rm -r /tmp/ftzz`                         | 117.8 ± 0.8 |    116.4 |    119.0 |      14.8 |       100.5 | 2.65 ± 0.11 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 179.8 ± 0.8 |    177.8 |    180.6 |      21.3 |       117.3 | 4.04 ± 0.16 |
-
-#### `remove_100_000_files_0_bytes.md`
-
-| Command                                   |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  481.6 ± 85.2 |    337.1 |    594.8 |      63.8 |      1743.7 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 753.6 ± 116.3 |    571.9 |    924.3 |     183.0 |      2364.7 | 1.56 ± 0.37 |
-| `./target/release/stdlib_rm /tmp/ftzz`    |  839.3 ± 27.3 |    801.8 |    892.3 |      38.4 |       740.7 | 1.74 ± 0.31 |
-| `find /tmp/ftzz -delete`                  |  849.9 ± 29.5 |    803.1 |    907.8 |      56.1 |       738.3 | 1.76 ± 0.32 |
-| `rm -r /tmp/ftzz`                         |  873.4 ± 38.9 |    832.3 |    954.1 |      49.0 |       756.5 | 1.81 ± 0.33 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 1009.2 ± 12.4 |    996.1 |   1029.2 |      93.6 |       851.3 | 2.10 ± 0.37 |
-
 #### `remove_1M_files_0_bytes.md`
 
-| Command                                   |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  5.336 ± 0.640 |   4.929 |   6.870 |    0.655 |     23.003 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     |  6.448 ± 0.445 |   6.119 |   7.544 |    1.414 |     23.285 | 1.21 ± 0.17 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 11.648 ± 0.094 |  11.553 |  11.861 |    0.470 |     10.883 | 2.18 ± 0.26 |
-| `find /tmp/ftzz -delete`                  | 11.781 ± 0.058 |  11.701 |  11.905 |    0.587 |     10.904 | 2.21 ± 0.26 |
-| `rm -r /tmp/ftzz`                         | 11.851 ± 0.060 |  11.758 |  11.958 |    0.578 |     10.976 | 2.22 ± 0.27 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 13.717 ± 0.090 |  13.582 |  13.876 |    1.140 |     12.289 | 2.57 ± 0.31 |
-
-#### `remove_10_files_100M_bytes.md`
-
-| Command                                   |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:------------------------------------------|-----------:|---------:|---------:|----------:|------------:|------------:|
-| `./target/release/rayon_rm /tmp/ftzz`     |  8.4 ± 0.2 |      8.0 |      9.0 |       1.4 |        51.0 |        1.00 |
-| *`./target/release/rmz /tmp/ftzz`*        |  9.1 ± 0.2 |      8.5 |      9.6 |       0.6 |        31.2 | 1.08 ± 0.04 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 25.3 ± 0.2 |     25.0 |     25.9 |       0.2 |        24.8 | 3.02 ± 0.09 |
-| `rm -r /tmp/ftzz`                         | 25.9 ± 0.4 |     25.3 |     26.6 |       0.4 |        25.1 | 3.08 ± 0.10 |
-| `find /tmp/ftzz -delete`                  | 26.6 ± 1.9 |     25.9 |     40.5 |       0.4 |        25.2 | 3.17 ± 0.24 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 74.1 ± 1.7 |     71.8 |     79.5 |       2.1 |        32.0 | 8.82 ± 0.32 |
-
-#### `remove_10_000_files_100M_bytes.md`
-
-| Command                                   |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  52.0 ± 2.1 |     49.2 |     57.2 |      12.5 |       288.6 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     |  62.2 ± 1.3 |     59.1 |     64.1 |      25.0 |       306.1 | 1.20 ± 0.05 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 154.3 ± 1.5 |    151.6 |    157.1 |       8.6 |       141.3 | 2.97 ± 0.12 |
-| `find /tmp/ftzz -delete`                  | 165.1 ± 0.8 |    164.0 |    166.6 |      14.7 |       145.6 | 3.18 ± 0.13 |
-| `rm -r /tmp/ftzz`                         | 166.3 ± 1.3 |    163.6 |    168.1 |      15.1 |       146.6 | 3.20 ± 0.13 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 229.7 ± 1.1 |    228.1 |    231.2 |      19.1 |       167.3 | 4.42 ± 0.18 |
-
-#### `remove_100_000_files_100M_bytes.md`
-
-| Command                                   |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        | 0.376 ± 0.031 |   0.354 |   0.456 |    0.050 |      1.939 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 0.655 ± 0.156 |   0.441 |   0.831 |    0.157 |      2.488 | 1.74 ± 0.44 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 1.019 ± 0.013 |   1.004 |   1.050 |    0.044 |      0.946 | 2.71 ± 0.23 |
-| `find /tmp/ftzz -delete`                  | 1.033 ± 0.010 |   1.021 |   1.046 |    0.054 |      0.947 | 2.75 ± 0.23 |
-| `rm -r /tmp/ftzz`                         | 1.059 ± 0.034 |   1.027 |   1.121 |    0.050 |      0.972 | 2.82 ± 0.25 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 1.216 ± 0.006 |   1.208 |   1.226 |    0.098 |      1.061 | 3.24 ± 0.27 |
+| Command                                        |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |  5.252 ± 0.462 |   4.904 |   6.123 |    0.655 |     23.224 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  6.755 ± 0.585 |   6.046 |   7.871 |    1.462 |     24.011 | 1.29 ± 0.16 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 11.622 ± 0.072 |  11.490 |  11.725 |    0.479 |     10.856 | 2.21 ± 0.19 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 11.643 ± 0.058 |  11.560 |  11.739 |    0.475 |     10.878 | 2.22 ± 0.20 |
+| `find /tmp/ftzz -delete`                       | 11.870 ± 0.079 |  11.782 |  12.039 |    0.617 |     10.923 | 2.26 ± 0.20 |
+| `rm -r /tmp/ftzz`                              | 11.873 ± 0.029 |  11.837 |  11.923 |    0.580 |     10.995 | 2.26 ± 0.20 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 13.733 ± 0.056 |  13.658 |  13.825 |    1.133 |     12.339 | 2.61 ± 0.23 |
 
 #### `remove_1M_files_100M_bytes.md`
 
-| Command                                   |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |  7.570 ± 0.158 |   7.307 |   7.776 |    0.642 |     36.387 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     |  9.506 ± 1.082 |   8.677 |  11.951 |    1.620 |     39.153 | 1.26 ± 0.15 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 23.826 ± 0.383 |  23.080 |  24.392 |    1.227 |     20.349 | 3.15 ± 0.08 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 27.119 ± 1.024 |  25.723 |  28.766 |    0.559 |     22.035 | 3.58 ± 0.15 |
-| `find /tmp/ftzz -delete`                  | 27.457 ± 1.118 |  25.960 |  29.451 |    0.708 |     22.040 | 3.63 ± 0.17 |
-| `rm -r /tmp/ftzz`                         | 27.878 ± 1.234 |  25.028 |  29.101 |    0.689 |     22.382 | 3.68 ± 0.18 |
+| Command                                        |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |  7.953 ± 0.686 |   7.146 |   9.129 |    0.675 |     37.039 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  9.168 ± 0.498 |   8.457 |  10.061 |    1.579 |     38.218 | 1.15 ± 0.12 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 23.807 ± 0.310 |  23.279 |  24.275 |    1.232 |     20.423 | 2.99 ± 0.26 |
+| `rm -r /tmp/ftzz`                              | 27.295 ± 0.987 |  24.878 |  28.402 |    0.678 |     22.116 | 3.43 ± 0.32 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 27.312 ± 1.177 |  25.140 |  29.140 |    0.561 |     22.185 | 3.43 ± 0.33 |
+| `find /tmp/ftzz -delete`                       | 27.709 ± 0.573 |  26.476 |  28.333 |    0.695 |     22.336 | 3.48 ± 0.31 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 27.991 ± 1.319 |  25.605 |  29.585 |    0.568 |     22.156 | 3.52 ± 0.35 |
+
+#### `remove_100_000_files_0_bytes.md`
+
+| Command                                        |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 548.5 ± 159.5 |    352.1 |    859.8 |      65.0 |      1852.8 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  661.5 ± 97.1 |    542.2 |    864.4 |     166.1 |      2184.0 | 1.21 ± 0.39 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  822.7 ± 23.7 |    792.4 |    868.6 |      39.1 |       737.2 | 1.50 ± 0.44 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  826.9 ± 26.3 |    785.6 |    872.3 |      41.0 |       735.4 | 1.51 ± 0.44 |
+| `rm -r /tmp/ftzz`                              |  843.2 ± 10.6 |    820.5 |    861.8 |      49.3 |       742.6 | 1.54 ± 0.45 |
+| `find /tmp/ftzz -delete`                       |  848.8 ± 18.4 |    819.8 |    878.7 |      52.5 |       735.4 | 1.55 ± 0.45 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1005.7 ± 12.7 |    993.1 |   1035.2 |      97.8 |       843.5 | 1.83 ± 0.53 |
 
 #### `remove_100_000_files_0_bytes_0_depth.md`
 
-| Command                                   |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        |   933.9 ± 7.9 |    921.4 |    947.3 |      29.1 |       886.4 |        1.00 |
-| `./target/release/stdlib_rm /tmp/ftzz`    |   941.9 ± 9.6 |    928.3 |    957.6 |      38.4 |       883.6 | 1.01 ± 0.01 |
-| `rm -r /tmp/ftzz`                         |   966.3 ± 6.7 |    960.2 |    983.9 |      58.4 |       889.3 | 1.03 ± 0.01 |
-| `find /tmp/ftzz -delete`                  |   968.7 ± 9.1 |    956.8 |    987.3 |      60.7 |       888.1 | 1.04 ± 0.01 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 1089.1 ± 11.3 |   1078.9 |   1109.8 |     102.1 |       930.0 | 1.17 ± 0.02 |
-| `perl -e 'for(</tmp/ftzz/*>){unlink}'`    | 1210.5 ± 11.3 |   1200.7 |   1240.8 |     147.9 |      1042.5 | 1.30 ± 0.02 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 1270.8 ± 10.8 |   1260.0 |   1287.1 |     103.9 |      2176.9 | 1.36 ± 0.02 |
-
-#### `remove_100_000_files_100M_bytes_0_depth.md`
-
-| Command                                   |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        | 1.155 ± 0.014 |   1.133 |   1.175 |    0.037 |      1.091 |        1.00 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 1.170 ± 0.011 |   1.152 |   1.185 |    0.042 |      1.098 | 1.01 ± 0.02 |
-| `find /tmp/ftzz -delete`                  | 1.180 ± 0.015 |   1.146 |   1.199 |    0.065 |      1.093 | 1.02 ± 0.02 |
-| `rm -r /tmp/ftzz`                         | 1.186 ± 0.014 |   1.165 |   1.208 |    0.067 |      1.098 | 1.03 ± 0.02 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 1.256 ± 0.013 |   1.237 |   1.281 |    0.113 |      2.749 | 1.09 ± 0.02 |
-| `rsync --delete -a /tmp/empty/ /tmp/ftzz` | 1.303 ± 0.004 |   1.297 |   1.311 |    0.103 |      1.147 | 1.13 ± 0.01 |
-| `perl -e 'for(</tmp/ftzz/*>){unlink}'`    | 1.439 ± 0.008 |   1.428 |   1.458 |    0.151 |      1.268 | 1.25 ± 0.02 |
+| Command                                        |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  939.5 ± 12.5 |    930.4 |    973.3 |      36.4 |       882.4 |        1.00 |
+| *`./target/release/rmz /tmp/ftzz`*             |  941.3 ± 19.9 |    925.9 |    993.1 |      34.6 |       889.1 | 1.00 ± 0.02 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  950.2 ± 18.3 |    930.6 |    985.8 |      39.5 |       884.2 | 1.01 ± 0.02 |
+| `rm -r /tmp/ftzz`                              |  969.0 ± 14.9 |    939.1 |    991.3 |      62.9 |       885.3 | 1.03 ± 0.02 |
+| `find /tmp/ftzz -delete`                       |  976.9 ± 13.9 |    958.5 |   1011.3 |      66.7 |       888.8 | 1.04 ± 0.02 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      |  1087.9 ± 9.6 |   1071.5 |   1102.6 |     100.0 |       924.2 | 1.16 ± 0.02 |
+| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         |  1209.8 ± 6.2 |   1200.4 |   1217.7 |     145.5 |      1047.3 | 1.29 ± 0.02 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 1273.4 ± 14.4 |   1252.0 |   1297.3 |     100.0 |      2192.6 | 1.36 ± 0.02 |
 
 #### `remove_100_000_files_0_bytes_5_files_per_dir.md`
 
-| Command                                   |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        | 0.820 ± 0.202 |   0.584 |   1.085 |    0.171 |      2.944 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 1.108 ± 0.218 |   0.799 |   1.473 |    0.404 |      3.617 | 1.35 ± 0.43 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 1.230 ± 0.055 |   1.178 |   1.352 |    0.107 |      1.046 | 1.50 ± 0.38 |
-| `find /tmp/ftzz -delete`                  | 1.361 ± 0.026 |   1.328 |   1.416 |    0.185 |      1.110 | 1.66 ± 0.41 |
-| `rm -r /tmp/ftzz`                         | 1.413 ± 0.030 |   1.380 |   1.479 |    0.186 |      1.147 | 1.72 ± 0.43 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz` | 1.497 ± 0.030 |   1.470 |   1.569 |    0.198 |      1.215 | 1.83 ± 0.45 |
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 0.814 ± 0.204 |   0.548 |   1.139 |    0.165 |      2.931 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 1.004 ± 0.099 |   0.853 |   1.171 |    0.384 |      3.453 | 1.23 ± 0.33 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 1.195 ± 0.013 |   1.173 |   1.208 |    0.109 |      1.034 | 1.47 ± 0.37 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.212 ± 0.024 |   1.181 |   1.267 |    0.110 |      1.036 | 1.49 ± 0.37 |
+| `find /tmp/ftzz -delete`                       | 1.372 ± 0.040 |   1.327 |   1.454 |    0.177 |      1.130 | 1.69 ± 0.42 |
+| `rm -r /tmp/ftzz`                              | 1.403 ± 0.029 |   1.367 |   1.445 |    0.190 |      1.154 | 1.72 ± 0.43 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.507 ± 0.026 |   1.462 |   1.565 |    0.193 |      1.224 | 1.85 ± 0.46 |
+
+#### `remove_100_000_files_100M_bytes.md`
+
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 0.541 ± 0.138 |   0.363 |   0.720 |    0.062 |      2.298 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 0.672 ± 0.196 |   0.449 |   0.993 |    0.153 |      2.507 | 1.24 ± 0.48 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 1.013 ± 0.007 |   1.001 |   1.024 |    0.045 |      0.939 | 1.87 ± 0.48 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.014 ± 0.009 |   1.004 |   1.036 |    0.044 |      0.941 | 1.87 ± 0.48 |
+| `find /tmp/ftzz -delete`                       | 1.031 ± 0.008 |   1.019 |   1.047 |    0.055 |      0.949 | 1.91 ± 0.48 |
+| `rm -r /tmp/ftzz`                              | 1.048 ± 0.042 |   1.015 |   1.163 |    0.048 |      0.965 | 1.94 ± 0.50 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.224 ± 0.017 |   1.204 |   1.261 |    0.101 |      1.057 | 2.26 ± 0.58 |
+
+#### `remove_100_000_files_100M_bytes_0_depth.md`
+
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 1.155 ± 0.010 |   1.143 |   1.172 |    0.032 |      1.098 |        1.00 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 1.162 ± 0.010 |   1.150 |   1.182 |    0.042 |      1.095 | 1.01 ± 0.01 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.166 ± 0.014 |   1.150 |   1.194 |    0.041 |      1.096 | 1.01 ± 0.01 |
+| `rm -r /tmp/ftzz`                              | 1.190 ± 0.007 |   1.179 |   1.205 |    0.062 |      1.107 | 1.03 ± 0.01 |
+| `find /tmp/ftzz -delete`                       | 1.192 ± 0.005 |   1.184 |   1.200 |    0.063 |      1.109 | 1.03 ± 0.01 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 1.246 ± 0.010 |   1.234 |   1.269 |    0.112 |      2.736 | 1.08 ± 0.01 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.300 ± 0.008 |   1.286 |   1.311 |    0.100 |      1.148 | 1.13 ± 0.01 |
+| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         | 1.434 ± 0.006 |   1.426 |   1.447 |    0.146 |      1.272 | 1.24 ± 0.01 |
 
 #### `remove_100_000_files_100M_bytes_5_files_per_dir.md`
 
-| Command                                   |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*        | 0.666 ± 0.071 |   0.601 |   0.795 |    0.149 |      3.046 |        1.00 |
-| `./target/release/rayon_rm /tmp/ftzz`     | 0.856 ± 0.100 |   0.723 |   1.000 |    0.311 |      3.500 | 1.29 ± 0.20 |
-| `./target/release/stdlib_rm /tmp/ftzz`    | 1.454 ± 0.009 |   1.440 |   1.466 |    0.107 |      1.298 | 2.18 ± 0.23 |
-| `find /tmp/ftzz -delete`                  | 1.609 ± 0.016 |   1.590 |   1.646 |    0.186 |      1.372 | 2.42 ± 0.26 |
-| `rm -r /tmp/ftzz`                         | 1.640 ± 0.014 |   1.622 |   1.670 |    0.187 |      1.405 | 2.46 ± 0.26 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz` | 1.772 ± 0.026 |   1.737 |   1.836 |    0.198 |      1.498 | 2.66 ± 0.29 |
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 0.649 ± 0.063 |   0.593 |   0.769 |    0.134 |      2.922 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 0.912 ± 0.143 |   0.749 |   1.165 |    0.324 |      3.599 | 1.41 ± 0.26 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 1.444 ± 0.032 |   1.412 |   1.517 |    0.111 |      1.279 | 2.23 ± 0.22 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.453 ± 0.020 |   1.430 |   1.500 |    0.109 |      1.284 | 2.24 ± 0.22 |
+| `find /tmp/ftzz -delete`                       | 1.593 ± 0.024 |   1.573 |   1.656 |    0.189 |      1.351 | 2.45 ± 0.24 |
+| `rm -r /tmp/ftzz`                              | 1.636 ± 0.015 |   1.612 |   1.665 |    0.187 |      1.392 | 2.52 ± 0.25 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.754 ± 0.024 |   1.730 |   1.798 |    0.198 |      1.479 | 2.70 ± 0.26 |
+
+#### `remove_10_000_files_0_bytes.md`
+
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |  45.0 ± 1.6 |     43.4 |     48.1 |      11.3 |       210.8 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  55.4 ± 1.9 |     52.5 |     59.3 |      24.3 |       223.5 | 1.23 ± 0.06 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 108.4 ± 0.8 |    106.4 |    109.5 |       8.8 |        97.3 | 2.41 ± 0.09 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 109.5 ± 4.0 |    106.5 |    126.0 |       9.6 |        96.9 | 2.43 ± 0.12 |
+| `find /tmp/ftzz -delete`                       | 119.6 ± 2.2 |    117.2 |    124.1 |      15.4 |       101.4 | 2.66 ± 0.11 |
+| `rm -r /tmp/ftzz`                              | 120.1 ± 0.9 |    118.7 |    121.7 |      15.7 |       101.8 | 2.67 ± 0.10 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 177.7 ± 0.7 |    176.4 |    179.1 |      18.2 |       118.3 | 3.95 ± 0.14 |
+
+#### `remove_10_000_files_100M_bytes.md`
+
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |  51.8 ± 1.6 |     49.2 |     54.6 |      10.4 |       288.9 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  62.8 ± 2.6 |     59.7 |     70.4 |      24.1 |       306.4 | 1.21 ± 0.06 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 154.2 ± 0.7 |    152.8 |    155.4 |       8.8 |       141.0 | 2.98 ± 0.09 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 154.3 ± 1.3 |    152.3 |    156.7 |      10.1 |       139.7 | 2.98 ± 0.09 |
+| `find /tmp/ftzz -delete`                       | 164.7 ± 1.2 |    161.6 |    165.9 |      13.9 |       145.1 | 3.18 ± 0.10 |
+| `rm -r /tmp/ftzz`                              | 165.9 ± 0.8 |    164.4 |    166.8 |      16.5 |       144.7 | 3.20 ± 0.10 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 226.1 ± 5.2 |    223.5 |    240.7 |      20.0 |       161.8 | 4.36 ± 0.17 |
+
+#### `remove_10_files_0_bytes.md`
+
+| Command                                        |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|-----------:|---------:|---------:|----------:|------------:|-------------:|
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  1.1 ± 0.0 |      1.0 |      1.2 |       0.3 |         0.7 |         1.00 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  1.1 ± 0.0 |      1.0 |      1.2 |       0.2 |         0.8 |  1.00 ± 0.03 |
+| *`./target/release/rmz /tmp/ftzz`*             |  1.1 ± 0.1 |      1.0 |      1.4 |       0.6 |         1.4 |  1.01 ± 0.06 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  1.4 ± 0.1 |      1.2 |      1.6 |       1.1 |         2.6 |  1.30 ± 0.07 |
+| `rm -r /tmp/ftzz`                              |  3.6 ± 0.1 |      3.4 |      4.3 |       1.0 |         2.4 |  3.33 ± 0.11 |
+| `find /tmp/ftzz -delete`                       |  4.2 ± 0.1 |      3.9 |      5.6 |       1.1 |         2.5 |  3.94 ± 0.16 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 46.8 ± 0.3 |     45.1 |     47.1 |       2.2 |         5.3 | 43.90 ± 1.07 |
+
+#### `remove_10_files_100M_bytes.md`
+
+| Command                                        |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|-----------:|---------:|---------:|----------:|------------:|------------:|
+| `./target/release/rm_rayon /tmp/ftzz`          |  8.2 ± 0.2 |      7.8 |      9.0 |       1.3 |        49.6 |        1.00 |
+| *`./target/release/rmz /tmp/ftzz`*             |  9.0 ± 0.3 |      8.4 |      9.6 |       0.6 |        30.7 | 1.10 ± 0.05 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 25.1 ± 0.2 |     24.6 |     26.2 |       0.2 |        24.6 | 3.05 ± 0.10 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 25.1 ± 0.1 |     24.8 |     25.4 |       0.3 |        24.5 | 3.05 ± 0.09 |
+| `rm -r /tmp/ftzz`                              | 25.6 ± 1.2 |     25.1 |     33.9 |       0.5 |        24.7 | 3.11 ± 0.17 |
+| `find /tmp/ftzz -delete`                       | 26.3 ± 0.7 |     25.9 |     31.4 |       0.5 |        24.9 | 3.19 ± 0.13 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 75.8 ± 3.1 |     69.9 |     82.0 |       1.8 |        34.1 | 9.20 ± 0.47 |
 
 ## Copy
 
