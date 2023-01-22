@@ -17,13 +17,13 @@ thiserror = "1.0.38"
 
 [dev-dependencies]
 criterion = "0.4.0"
-ftzz = "1.1.4"
+ftzz = "1.2.0"
 tempfile = "3.3.0"
 trycmd = "0.14.10"
-rayon_rm = { path = "../comparisons/rayon_rm" }
-og_crappy_rm = { path = "../comparisons/og_crappy_rm" }
-stdlib_rm = { path = "../comparisons/stdlib_rm" }
-supercilex-tests = "0.2.1"
+rm_rayon = { path = "../comparisons/rm_rayon" }
+rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
+supercilex-tests = "0.2.2"
+remove_dir_all = "0.7.0"
 
 [[bench]]
 name = "rmz"

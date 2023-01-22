@@ -20,12 +20,12 @@ cache-size = "0.6.0"
 criterion = "0.4.0"
 memmap2 = "0.5.8"
 rand = "0.8.5"
-supercilex-tests = "0.2.1"
+supercilex-tests = "0.2.2"
 tempfile = "3.3.0"
 trycmd = "0.14.10"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.36.6", features = ["fs"] }
+rustix = { version = "0.36.7", features = ["fs"] }
 
 [[bench]]
 name = "copy_methods"

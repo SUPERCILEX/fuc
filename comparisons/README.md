@@ -27,8 +27,8 @@ for num_bytes in {0,100M}; do
         "rm -r /tmp/ftzz" \
         "find /tmp/ftzz -delete" \
         "rsync --delete -r /tmp/empty/ /tmp/ftzz" \
-        "./target/release/stdlib_rm /tmp/ftzz" \
-        "./target/release/rayon_rm /tmp/ftzz" \
+        "./target/release/rm_stdlib /tmp/ftzz" \
+        "./target/release/rm_rayon /tmp/ftzz" \
         "./target/release/rmz /tmp/ftzz"
   done
 
@@ -40,8 +40,8 @@ for num_bytes in {0,100M}; do
       "find /tmp/ftzz -delete" \
       "rsync --delete -r /tmp/empty/ /tmp/ftzz" \
       "perl -e 'for(</tmp/ftzz/*>){unlink}'" \
-      "./target/release/stdlib_rm /tmp/ftzz" \
-      "./target/release/rayon_rm /tmp/ftzz" \
+      "./target/release/rm_stdlib /tmp/ftzz" \
+      "./target/release/rm_rayon /tmp/ftzz" \
       "./target/release/rmz /tmp/ftzz"
 
   hyperfine --warmup 3 -N \
@@ -51,8 +51,8 @@ for num_bytes in {0,100M}; do
       "rm -r /tmp/ftzz" \
       "find /tmp/ftzz -delete" \
       "rsync --delete -r /tmp/empty/ /tmp/ftzz" \
-      "./target/release/stdlib_rm /tmp/ftzz" \
-      "./target/release/rayon_rm /tmp/ftzz" \
+      "./target/release/rm_stdlib /tmp/ftzz" \
+      "./target/release/rm_rayon /tmp/ftzz" \
       "./target/release/rmz /tmp/ftzz"
 done
 ```
@@ -218,8 +218,8 @@ for num_bytes in {0,100M}; do
         "./wcp/build/wcp /tmp/ftzz /tmp/ftzzz" \
         "rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz" \
         "sh -c '(cd /tmp/ftzz; tar cf - .) | (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'" \
-        "./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz" \
-        "./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz" \
+        "./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz" \
+        "./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz" \
         "./target/release/cpz /tmp/ftzz /tmp/ftzzz"
   done
 
@@ -234,8 +234,8 @@ for num_bytes in {0,100M}; do
       "./wcp/build/wcp /tmp/ftzz /tmp/ftzzz" \
       "rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz" \
       "sh -c '(cd /tmp/ftzz; tar cf - .) | (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'" \
-      "./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz" \
-      "./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz" \
+      "./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz" \
+      "./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz" \
       "./target/release/cpz /tmp/ftzz /tmp/ftzzz"
 
   hyperfine --warmup 3 -N \
@@ -249,8 +249,8 @@ for num_bytes in {0,100M}; do
       "./wcp/build/wcp /tmp/ftzz /tmp/ftzzz" \
       "rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz" \
       "sh -c '(cd /tmp/ftzz; tar cf - .) | (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'" \
-      "./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz" \
-      "./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz" \
+      "./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz" \
+      "./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz" \
       "./target/release/cpz /tmp/ftzz /tmp/ftzzz"
 done
 
@@ -265,8 +265,8 @@ hyperfine --warmup 3 -N \
     "./wcp/build/wcp /tmp/ftzz /tmp/ftzzz" \
     "rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz" \
     "sh -c '(cd /tmp/ftzz; tar cf - .) | (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'" \
-    "./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz" \
-    "./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz" \
+    "./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz" \
+    "./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz" \
     "./target/release/cpz /tmp/ftzz /tmp/ftzzz"
 ```
 

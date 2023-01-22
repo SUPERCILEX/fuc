@@ -3,11 +3,12 @@ members = [
     "cpz",
     "fuc_engine",
     "rmz",
-    "comparisons/rayon_rm",
-    "comparisons/og_crappy_rm",
-    "comparisons/stdlib_rm",
-    "comparisons/rayon_cp",
-    "comparisons/stdlib_cp",
+    "comparisons/cp_rayon",
+    "comparisons/cp_stdlib",
+    "comparisons/rm_og_crappy",
+    "comparisons/rm_rayon",
+    "comparisons/rm_remove_dir_all",
+    "comparisons/rm_stdlib",
 ]
 
 [workspace.package]
@@ -23,7 +24,7 @@ version = "0.0.0"
 publish = false
 
 [dev-dependencies]
-supercilex-tests = "0.2.1"
+supercilex-tests = "0.2.2"
 
 [profile.release]
 lto = true

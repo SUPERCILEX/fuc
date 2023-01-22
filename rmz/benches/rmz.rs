@@ -1,4 +1,4 @@
-use std::{fmt, fs::File, num::NonZeroU64, path::Path, time::Duration};
+use std::{fmt, fs, fs::File, num::NonZeroU64, path::Path, time::Duration};
 
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BenchmarkGroup, BenchmarkId,
@@ -164,7 +164,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("rayon_rm::remove_dir_all", num_files),
+        BenchmarkId::new("rm_rayon::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -174,7 +174,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    rayon_rm::remove_dir_all(dir.path()).unwrap();
+                    rm_rayon::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },
@@ -183,7 +183,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("og_crappy_rm::remove_dir_all", num_files),
+        BenchmarkId::new("rm_og_crappy::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -193,7 +193,7 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    og_crappy_rm::remove_dir_all(dir.path()).unwrap();
+                    rm_og_crappy::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },
@@ -202,7 +202,7 @@ fn add_benches(
     );
 
     group.bench_with_input(
-        BenchmarkId::new("stdlib_rm::remove_dir_all", num_files),
+        BenchmarkId::new("fs::remove_dir_all", num_files),
         &num_files,
         |b, num_files| {
             b.iter_with_setup(
@@ -212,7 +212,26 @@ fn add_benches(
                     dir
                 },
                 |dir| {
-                    stdlib_rm::remove_dir_all(dir.path()).unwrap();
+                    fs::remove_dir_all(dir.path()).unwrap();
+                    assert!(!dir.path().exists());
+                    dir
+                },
+            );
+        },
+    );
+
+    group.bench_with_input(
+        BenchmarkId::new("remove_dir_all::remove_dir_all", num_files),
+        &num_files,
+        |b, num_files| {
+            b.iter_with_setup(
+                || {
+                    let dir = tempdir().unwrap();
+                    gen_files(dir.path(), *num_files);
+                    dir
+                },
+                |dir| {
+                    remove_dir_all::remove_dir_all(dir.path()).unwrap();
                     assert!(!dir.path().exists());
                     dir
                 },

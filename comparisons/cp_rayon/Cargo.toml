@@ -1,5 +1,8 @@
 [package]
-name = "stdlib_rm"
+name = "cp_rayon"
 version = "0.0.0"
 edition.workspace = true
 publish = false
+
+[dependencies]
+rayon = "1.6.1"

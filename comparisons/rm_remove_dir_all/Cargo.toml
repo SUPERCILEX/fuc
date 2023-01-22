@@ -1,8 +1,8 @@
 [package]
-name = "rayon_cp"
+name = "rm_remove_dir_all"
 version = "0.0.0"
 edition.workspace = true
 publish = false
 
 [dependencies]
-rayon = "1.6.1"
+remove_dir_all = "0.7.0"
