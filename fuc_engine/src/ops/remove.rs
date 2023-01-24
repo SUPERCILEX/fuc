@@ -122,7 +122,9 @@ mod compat {
         DirectoryOp<Cow<'_, Path>> for Impl<LF>
     {
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
-            let (tasks, _) = &*self.scheduling;
+            let Self { ref scheduling } = *self;
+
+            let (tasks, _) = &**scheduling;
             tasks
                 .send(Message::Node(TreeNode {
                     path: path_buf_to_cstring(dir.into_owned())?,
@@ -133,7 +135,9 @@ mod compat {
         }
 
         fn finish(self) -> Result<(), Error> {
-            if let Some((tasks, thread)) = self.scheduling.into_inner() {
+            let Self { scheduling } = self;
+
+            if let Some((tasks, thread)) = scheduling.into_inner() {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
@@ -246,11 +250,17 @@ mod compat {
 
     impl Drop for TreeNode {
         fn drop(&mut self) {
-            if let Err(e) = unlinkat(cwd(), self.path.as_c_str(), AtFlags::REMOVEDIR)
-                .map_io_err(|| format!("Failed to delete directory: {:?}", self.path))
+            let Self {
+                ref path,
+                _parent: _,
+                ref messages,
+            } = *self;
+
+            if let Err(e) = unlinkat(cwd(), path.as_c_str(), AtFlags::REMOVEDIR)
+                .map_io_err(|| format!("Failed to delete directory: {path:?}"))
             {
                 // If the receiver closed, then another error must have already occurred.
-                drop(self.messages.send(Message::Error(e)));
+                drop(messages.send(Message::Error(e)));
             }
         }
     }

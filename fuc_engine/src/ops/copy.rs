@@ -184,7 +184,7 @@ mod compat {
                         }));
                     }
 
-                    copy_dir(node, &mut buf, &symlink_buf_cache)?;
+                    copy_dir(&node, &mut buf, &symlink_buf_cache)?;
                 }
             }
 
@@ -199,32 +199,37 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(node, &mut buf, &symlink_buf_cache)?;
+            copy_dir(&node, &mut buf, &symlink_buf_cache)?;
         }
         Ok(())
     }
 
     fn copy_dir(
-        mut node: TreeNode,
+        node @ TreeNode {
+            from,
+            to,
+            messages,
+            root_to_inode: _,
+        }: &TreeNode,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
         let from_dir = openat(
             cwd(),
-            node.from.as_c_str(),
+            from.as_c_str(),
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
         )
-        .map_io_err(|| format!("Failed to open directory: {:?}", node.from))?;
-        let to_dir = copy_one_dir(&from_dir, &node)?;
-        let root_to_inode = maybe_compute_root_to_inode(&to_dir, &mut node)?;
+        .map_io_err(|| format!("Failed to open directory: {from:?}"))?;
+        let to_dir = copy_one_dir(&from_dir, node)?;
+        let root_to_inode = maybe_compute_root_to_inode(&to_dir, node)?;
 
         let mut raw_dir = RawDir::new(&from_dir, buf);
         while let Some(file) = raw_dir.next() {
             const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
             const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
 
-            let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.from))?;
+            let file = file.map_io_err(|| format!("Failed to read directory: {from:?}"))?;
             if file.file_name() == DOT || file.file_name() == DOT_DOT {
                 continue;
             }
@@ -234,16 +239,16 @@ mod compat {
             }
 
             let file_type = match file.file_type() {
-                FileType::Unknown => get_file_type(&from_dir, file.file_name(), &node.from)?,
+                FileType::Unknown => get_file_type(&from_dir, file.file_name(), from)?,
                 t => t,
             };
             if file_type == FileType::Directory {
-                node.messages
+                messages
                     .send(TreeNode {
-                        from: concat_cstrs(&node.from, file.file_name()),
-                        to: concat_cstrs(&node.to, file.file_name()),
-                        messages: node.messages.clone(),
-                        root_to_inode: node.root_to_inode,
+                        from: concat_cstrs(from, file.file_name()),
+                        to: concat_cstrs(to, file.file_name()),
+                        messages: messages.clone(),
+                        root_to_inode: Some(root_to_inode),
                     })
                     .map_err(|_| Error::Internal)?;
             } else {
@@ -252,7 +257,7 @@ mod compat {
                     &to_dir,
                     file.file_name(),
                     file_type,
-                    &node,
+                    node,
                     symlink_buf_cache,
                 )?;
             }
@@ -260,23 +265,26 @@ mod compat {
         Ok(())
     }
 
-    fn copy_one_dir(from_dir: impl AsFd, node: &TreeNode) -> Result<OwnedFd, Error> {
+    fn copy_one_dir(
+        from_dir: impl AsFd,
+        TreeNode { from, to, .. }: &TreeNode,
+    ) -> Result<OwnedFd, Error> {
         const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
 
         let from_mode = {
             let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
-                .map_io_err(|| format!("Failed to stat directory: {:?}", node.from))?;
+                .map_io_err(|| format!("Failed to stat directory: {from:?}"))?;
             Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
         };
-        mkdirat(cwd(), node.to.as_c_str(), from_mode)
-            .map_io_err(|| format!("Failed to create directory: {:?}", node.to))?;
+        mkdirat(cwd(), to.as_c_str(), from_mode)
+            .map_io_err(|| format!("Failed to create directory: {to:?}"))?;
         openat(
             cwd(),
-            node.to.as_c_str(),
+            to.as_c_str(),
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
             Mode::empty(),
         )
-        .map_io_err(|| format!("Failed to open directory: {:?}", node.to))
+        .map_io_err(|| format!("Failed to open directory: {to:?}"))
     }
 
     fn copy_one_file(
@@ -303,7 +311,9 @@ mod compat {
         from: OwnedFd,
         to: OwnedFd,
         file_name: &CStr,
-        node: &TreeNode,
+        node @ TreeNode {
+            from: from_path, ..
+        }: &TreeNode,
     ) -> Result<(), Error> {
         let mut total_copied = 0;
         loop {
@@ -315,7 +325,7 @@ mod compat {
                 r => r.map_io_err(|| {
                     format!(
                         "Failed to copy file: {:?}",
-                        join_cstr_paths(&node.from, file_name)
+                        join_cstr_paths(from_path, file_name)
                     )
                 })?,
             };
@@ -332,13 +342,15 @@ mod compat {
         from: OwnedFd,
         to: OwnedFd,
         file_name: &CStr,
-        node: &TreeNode,
+        TreeNode {
+            from: from_path, ..
+        }: &TreeNode,
     ) -> Result<(), Error> {
         io::copy(&mut File::from(from), &mut File::from(to))
             .map_io_err(|| {
                 format!(
                     "Failed to copy file: {:?}",
-                    join_cstr_paths(&node.from, file_name)
+                    join_cstr_paths(from_path, file_name)
                 )
             })
             .map(|_| ())
@@ -348,13 +360,17 @@ mod compat {
         from_dir: impl AsFd,
         to_dir: impl AsFd,
         file_name: &CStr,
-        node: &TreeNode,
+        TreeNode {
+            from: from_path,
+            to: to_path,
+            ..
+        }: &TreeNode,
     ) -> Result<(OwnedFd, OwnedFd), Error> {
         let from =
             openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty()).map_io_err(|| {
                 format!(
                     "Failed to open file: {:?}",
-                    join_cstr_paths(&node.from, file_name)
+                    join_cstr_paths(from_path, file_name)
                 )
             })?;
         let from_mode = {
@@ -362,7 +378,7 @@ mod compat {
                 .map_io_err(|| {
                     format!(
                         "Failed to stat file: {:?}",
-                        join_cstr_paths(&node.from, file_name)
+                        join_cstr_paths(from_path, file_name)
                     )
                 })?;
             Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
@@ -377,7 +393,7 @@ mod compat {
         .map_io_err(|| {
             format!(
                 "Failed to open file: {:?}",
-                join_cstr_paths(&node.to, file_name)
+                join_cstr_paths(to_path, file_name)
             )
         })?;
 
@@ -389,21 +405,25 @@ mod compat {
         from_dir: impl AsFd,
         to_dir: impl AsFd,
         file_name: &CStr,
-        node: &TreeNode,
+        TreeNode {
+            from: from_path,
+            to: to_path,
+            ..
+        }: &TreeNode,
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
         let from_symlink =
             readlinkat(from_dir, file_name, symlink_buf_cache.take()).map_io_err(|| {
                 format!(
                     "Failed to read symlink: {:?}",
-                    join_cstr_paths(&node.from, file_name)
+                    join_cstr_paths(from_path, file_name)
                 )
             })?;
 
         symlinkat(from_symlink.as_c_str(), &to_dir, file_name).map_io_err(|| {
             format!(
                 "Failed to create symlink: {:?}",
-                join_cstr_paths(&node.to, file_name)
+                join_cstr_paths(to_path, file_name)
             )
         })?;
 
@@ -411,16 +431,20 @@ mod compat {
         Ok(())
     }
 
-    fn maybe_compute_root_to_inode(to_dir: impl AsFd, node: &mut TreeNode) -> Result<u64, Error> {
-        Ok(if let Some(ino) = node.root_to_inode {
+    fn maybe_compute_root_to_inode(
+        to_dir: impl AsFd,
+        TreeNode {
+            to, root_to_inode, ..
+        }: &TreeNode,
+    ) -> Result<u64, Error> {
+        Ok(if let Some(ino) = *root_to_inode {
             ino
         } else {
             const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
 
-            let to_stat = statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO)
-                .map_io_err(|| format!("Failed to stat directory: {:?}", node.to))?;
-            node.root_to_inode = Some(to_stat.stx_ino);
-            to_stat.stx_ino
+            let to_metadata = statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO)
+                .map_io_err(|| format!("Failed to stat directory: {to:?}"))?;
+            to_metadata.stx_ino
         })
     }
 
