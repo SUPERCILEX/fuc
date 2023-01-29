@@ -276,8 +276,11 @@ mod compat {
                 .map_io_err(|| format!("Failed to stat directory: {from:?}"))?;
             Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
         };
-        mkdirat(cwd(), to.as_c_str(), from_mode)
-            .map_io_err(|| format!("Failed to create directory: {to:?}"))?;
+        match mkdirat(cwd(), to.as_c_str(), from_mode) {
+            Err(Errno::EXIST) => {}
+            r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
+        };
+
         openat(
             cwd(),
             to.as_c_str(),
@@ -495,7 +498,10 @@ mod compat {
         #[cfg(unix)] root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
-        fs::create_dir(to)?;
+        match fs::create_dir(to) {
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
+            r => r?,
+        };
         #[cfg(unix)]
         let root_to_inode = Some(maybe_compute_root_to_inode(to, root_to_inode)?);
 

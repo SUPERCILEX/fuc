@@ -35,6 +35,30 @@ fn pre_existing_file_force() {
 }
 
 #[test]
+fn pre_existing_dir_force() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    File::create(from.join("a")).unwrap();
+    File::create(from.join("b")).unwrap();
+    let to = root.path().join("to");
+    fs::create_dir(&to).unwrap();
+    File::create(to.join("b")).unwrap();
+    File::create(to.join("c")).unwrap();
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(to.join("a").exists());
+    assert!(to.join("b").exists());
+    assert!(to.join("c").exists());
+}
+
+#[test]
 #[cfg(unix)]
 fn self_nested() {
     let root = tempdir().unwrap();
