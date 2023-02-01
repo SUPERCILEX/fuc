@@ -15,6 +15,9 @@ Binaries for a number of platforms are available on the
 $ cargo +nightly install rmz
 ```
 
+> To install cargo, follow
+> [these instructions](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+
 ## Usage
 
 Background: https://github.com/SUPERCILEX/fuc/blob/master/README.md
