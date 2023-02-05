@@ -5,7 +5,7 @@ use std::{
     borrow::Cow,
     cell::LazyCell,
     fs,
-    path::{PathBuf, MAIN_SEPARATOR},
+    path::{PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
 };
 
 use clap::{ArgAction, Parser, ValueHint};
@@ -61,8 +61,16 @@ fn main() -> error_stack::Result<(), CliError> {
             Error::Io { error, context } => Report::from(error)
                 .attach_printable(context)
                 .change_context(wrapper),
-            Error::AlreadyExists { file: _ } => {
-                Report::from(wrapper).attach_printable("Use --force to overwrite.")
+            Error::AlreadyExists { file } => {
+                let report = Report::from(wrapper);
+                match file.symlink_metadata().map(|m| m.is_dir()) {
+                    Ok(true) => {
+                        let mut file = file.into_os_string();
+                        file.push(MAIN_SEPARATOR_STR);
+                        report.attach_printable(format!("Use {file:?} to copy into the directory."))
+                    }
+                    Ok(false) | Err(_) => report.attach_printable("Use --force to overwrite."),
+                }
             }
             Error::Join | Error::BadPath | Error::Internal => Report::from(wrapper),
             Error::PreserveRoot | Error::NotFound { file: _ } => unreachable!(),
