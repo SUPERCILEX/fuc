@@ -11,7 +11,7 @@ license.workspace = true
 
 [dependencies]
 clap2 = { version = "4.0.32", features = ["derive", "wrap_help"] }
-error-stack = "0.2.4"
+error-stack = "0.3.0"
 fuc_engine = { version = "1.1.3", path = "../fuc_engine" }
 thiserror = "1.0.38"
 
@@ -22,10 +22,10 @@ memmap2 = "0.5.8"
 rand = "0.8.5"
 supercilex-tests = "0.2.2"
 tempfile = "3.3.0"
-trycmd = "0.14.10"
+trycmd = "0.14.11"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.36.7", features = ["fs"] }
+rustix = { version = "0.36.8", features = ["fs"] }
 
 [[bench]]
 name = "copy_methods"

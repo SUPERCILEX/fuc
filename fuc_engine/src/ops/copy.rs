@@ -320,18 +320,18 @@ mod compat {
     ) -> Result<(), Error> {
         let mut total_copied = 0;
         loop {
-            let byte_copied = match copy_file_range(&from, None, &to, None, u64::MAX - total_copied)
-            {
-                Err(Errno::XDEV) if total_copied == 0 => {
-                    return copy_any_file(from, to, file_name, node);
-                }
-                r => r.map_io_err(|| {
-                    format!(
-                        "Failed to copy file: {:?}",
-                        join_cstr_paths(from_path, file_name)
-                    )
-                })?,
-            };
+            let byte_copied =
+                match copy_file_range(&from, None, &to, None, usize::MAX - total_copied) {
+                    Err(Errno::XDEV) if total_copied == 0 => {
+                        return copy_any_file(from, to, file_name, node);
+                    }
+                    r => r.map_io_err(|| {
+                        format!(
+                            "Failed to copy file: {:?}",
+                            join_cstr_paths(from_path, file_name)
+                        )
+                    })?,
+                };
 
             if byte_copied == 0 {
                 return Ok(());
