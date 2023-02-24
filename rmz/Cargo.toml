@@ -23,7 +23,7 @@ trycmd = "0.14.11"
 rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 supercilex-tests = "0.2.2"
-remove_dir_all = "0.7.0"
+remove_dir_all = "0.8.0"
 
 [[bench]]
 name = "rmz"
