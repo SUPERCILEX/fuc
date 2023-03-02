@@ -1,3 +1,6 @@
+// TODO
+#![allow(clippy::significant_drop_tightening)]
+
 use std::{fmt, fs, fs::File, num::NonZeroU64, path::Path, time::Duration};
 
 use criterion::{

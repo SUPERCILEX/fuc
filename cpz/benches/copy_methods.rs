@@ -1,3 +1,6 @@
+// TODO
+#![allow(clippy::significant_drop_tightening)]
+
 use std::{
     alloc,
     alloc::Layout,
@@ -266,7 +269,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .unwrap();
                     to.set_len(*num_bytes).unwrap();
 
-                    let mut bytes_remaining = *num_bytes;
+                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
                     while bytes_remaining > 0 {
                         bytes_remaining -=
                             copy_file_range(&from, None, &to, None, bytes_remaining).unwrap();

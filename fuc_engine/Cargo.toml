@@ -10,13 +10,12 @@ categories = ["filesystem"]
 license.workspace = true
 
 [dependencies]
-crossbeam-channel = "0.5.6"
+crossbeam-channel = "0.5.7"
 thiserror = "1.0.38"
 typed-builder = "0.12.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# TODO statx perf
-rustix = { version = "0.37.0-alpha.0", features = ["fs"] }
+rustix = { version = "0.37.0", features = ["fs", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rayon = "1.6.1"
