@@ -11,20 +11,20 @@ license.workspace = true
 
 [dependencies]
 crossbeam-channel = "0.5.7"
-thiserror = "1.0.38"
-typed-builder = "0.12.0"
+thiserror = "1.0.40"
+typed-builder = "0.14.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.37.0", features = ["fs", "linux_latest"] }
+rustix = { version = "0.37.3", features = ["fs", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-rayon = "1.6.1"
+rayon = "1.7.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 remove_dir_all = "0.8.1"
 
 [dev-dependencies]
-ftzz = "1.2.0"
-rstest = { version = "0.16.0", default-features = false }
-supercilex-tests = "0.3.0"
+ftzz = "2.0.0"
+rstest = { version = "0.17.0", default-features = false }
+supercilex-tests = "0.3.1"
 tempfile = "3.4.0"

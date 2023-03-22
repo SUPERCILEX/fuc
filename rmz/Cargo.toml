@@ -13,16 +13,16 @@ license.workspace = true
 clap2 = { version = "4.1.8", features = ["derive", "wrap_help"] }
 error-stack = "0.3.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
-thiserror = "1.0.38"
+thiserror = "1.0.40"
 
 [dev-dependencies]
 criterion = "0.4.0"
-ftzz = "1.2.0"
+ftzz = "2.0.0"
 tempfile = "3.4.0"
-trycmd = "0.14.13"
+trycmd = "0.14.15"
 rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
-supercilex-tests = "0.3.0"
+supercilex-tests = "0.3.1"
 remove_dir_all = "0.8.1"
 
 [[bench]]
