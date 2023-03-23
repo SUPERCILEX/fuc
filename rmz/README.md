@@ -1,5 +1,7 @@
 # rm zippy
 
+[![Crates.io](https://img.shields.io/crates/v/rmz?style=flat-square)](https://crates.io/crates/rmz)
+
 A zippy alternative to `rm`, a tool to remove files and directories.
 
 ## Installation
