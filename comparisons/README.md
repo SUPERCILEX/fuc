@@ -13,12 +13,22 @@ cargo b --workspace --release
 mkdir benches /tmp/empty
 ```
 
+### My environment
+
+- Linux: 6.2.6-76060206-generic
+- CPU: Intel i7-10875H
+- Memory: 64038MiB
+- `/tmp` was mounted as a `tmpfs /tmp tmpfs rw,nosuid,nodev,size=32787840k,inode64 0 0` to not
+  destroy my laptop's SSD. Thus, the results implicitly assume zero-overhead I/O. I've found the
+  relative scaling position to be mostly consistent when benchmarked on a real FS while the relative
+  numbers are exaggerated (e.g. something 10x slower is probably 4x slower in reality).
+
 ## Remove
 
 ### Run
 
 ```bash
-for num_bytes in {0,100M}; do
+for num_bytes in {0,1G}; do
   for num_files in {10,10_000,100_000,1M}; do
     hyperfine --warmup 3 -N \
       --export-markdown "benches/remove_${num_files}_files_${num_bytes}_bytes.md" \
@@ -64,149 +74,149 @@ done
 
 #### `remove_1M_files_0_bytes.md`
 
-| Command                                        |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             |  5.252 ± 0.462 |   4.904 |   6.123 |    0.655 |     23.224 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  6.755 ± 0.585 |   6.046 |   7.871 |    1.462 |     24.011 | 1.29 ± 0.16 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 11.622 ± 0.072 |  11.490 |  11.725 |    0.479 |     10.856 | 2.21 ± 0.19 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 11.643 ± 0.058 |  11.560 |  11.739 |    0.475 |     10.878 | 2.22 ± 0.20 |
-| `find /tmp/ftzz -delete`                       | 11.870 ± 0.079 |  11.782 |  12.039 |    0.617 |     10.923 | 2.26 ± 0.20 |
-| `rm -r /tmp/ftzz`                              | 11.873 ± 0.029 |  11.837 |  11.923 |    0.580 |     10.995 | 2.26 ± 0.20 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 13.733 ± 0.056 |  13.658 |  13.825 |    1.133 |     12.339 | 2.61 ± 0.23 |
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 0.233 ± 0.007 |   0.220 |   0.247 |    0.093 |      3.060 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 0.267 ± 0.006 |   0.259 |   0.276 |    0.437 |      3.502 |  1.15 ± 0.04 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 1.658 ± 0.013 |   1.639 |   1.680 |    0.104 |      1.480 |  7.11 ± 0.21 |
+| `find /tmp/ftzz -delete`                       | 1.723 ± 0.013 |   1.706 |   1.742 |    0.176 |      1.476 |  7.39 ± 0.22 |
+| `rm -r /tmp/ftzz`                              | 1.780 ± 0.018 |   1.740 |   1.798 |    0.159 |      1.553 |  7.63 ± 0.23 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 2.812 ± 0.021 |   2.769 |   2.835 |    0.382 |      2.356 | 12.06 ± 0.36 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 3.324 ± 0.035 |   3.279 |   3.402 |    0.284 |      2.978 | 14.25 ± 0.44 |
 
-#### `remove_1M_files_100M_bytes.md`
+#### `remove_1M_files_1G_bytes.md`
 
-| Command                                        |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             |  7.953 ± 0.686 |   7.146 |   9.129 |    0.675 |     37.039 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  9.168 ± 0.498 |   8.457 |  10.061 |    1.579 |     38.218 | 1.15 ± 0.12 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 23.807 ± 0.310 |  23.279 |  24.275 |    1.232 |     20.423 | 2.99 ± 0.26 |
-| `rm -r /tmp/ftzz`                              | 27.295 ± 0.987 |  24.878 |  28.402 |    0.678 |     22.116 | 3.43 ± 0.32 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 27.312 ± 1.177 |  25.140 |  29.140 |    0.561 |     22.185 | 3.43 ± 0.33 |
-| `find /tmp/ftzz -delete`                       | 27.709 ± 0.573 |  26.476 |  28.333 |    0.695 |     22.336 | 3.48 ± 0.31 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 27.991 ± 1.319 |  25.605 |  29.585 |    0.568 |     22.156 | 3.52 ± 0.35 |
+| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             | 0.321 ± 0.007 |   0.311 |   0.332 |    0.105 |      4.223 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 0.457 ± 0.206 |   0.373 |   1.040 |    0.508 |      5.481 |  1.42 ± 0.64 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 2.228 ± 0.050 |   2.188 |   2.320 |    0.144 |      2.027 |  6.94 ± 0.22 |
+| `find /tmp/ftzz -delete`                       | 2.345 ± 0.053 |   2.301 |   2.457 |    0.208 |      2.086 |  7.30 ± 0.23 |
+| `rm -r /tmp/ftzz`                              | 2.398 ± 0.087 |   2.329 |   2.583 |    0.195 |      2.153 |  7.47 ± 0.32 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 3.486 ± 0.076 |   3.347 |   3.579 |    0.461 |      2.961 | 10.85 ± 0.34 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 3.802 ± 0.052 |   3.691 |   3.881 |    0.347 |      3.408 | 11.84 ± 0.31 |
 
 #### `remove_100_000_files_0_bytes.md`
 
-| Command                                        |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:-----------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             | 548.5 ± 159.5 |    352.1 |    859.8 |      65.0 |      1852.8 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  661.5 ± 97.1 |    542.2 |    864.4 |     166.1 |      2184.0 | 1.21 ± 0.39 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` |  822.7 ± 23.7 |    792.4 |    868.6 |      39.1 |       737.2 | 1.50 ± 0.44 |
-| `./target/release/rm_stdlib /tmp/ftzz`         |  826.9 ± 26.3 |    785.6 |    872.3 |      41.0 |       735.4 | 1.51 ± 0.44 |
-| `rm -r /tmp/ftzz`                              |  843.2 ± 10.6 |    820.5 |    861.8 |      49.3 |       742.6 | 1.54 ± 0.45 |
-| `find /tmp/ftzz -delete`                       |  848.8 ± 18.4 |    819.8 |    878.7 |      52.5 |       735.4 | 1.55 ± 0.45 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1005.7 ± 12.7 |    993.1 |   1035.2 |      97.8 |       843.5 | 1.83 ± 0.53 |
+| Command                                        |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|-------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |   24.6 ± 1.9 |     20.8 |     30.6 |      10.7 |       283.7 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  47.9 ± 12.5 |     32.7 |     80.7 |      38.6 |       313.4 |  1.95 ± 0.53 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  165.8 ± 3.6 |    159.0 |    173.2 |      11.4 |       148.5 |  6.74 ± 0.55 |
+| `find /tmp/ftzz -delete`                       |  174.0 ± 4.6 |    166.9 |    180.9 |      19.8 |       147.4 |  7.07 ± 0.58 |
+| `rm -r /tmp/ftzz`                              |  182.8 ± 3.1 |    177.0 |    188.1 |      19.7 |       156.5 |  7.43 ± 0.60 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      |  320.1 ± 2.5 |    316.8 |    323.8 |      44.1 |       234.3 | 13.01 ± 1.02 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 336.3 ± 10.7 |    328.5 |    364.0 |      26.4 |       303.2 | 13.66 ± 1.15 |
 
 #### `remove_100_000_files_0_bytes_0_depth.md`
 
-| Command                                        |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:-----------------------------------------------|--------------:|---------:|---------:|----------:|------------:|------------:|
-| `./target/release/rm_remove_dir_all /tmp/ftzz` |  939.5 ± 12.5 |    930.4 |    973.3 |      36.4 |       882.4 |        1.00 |
-| *`./target/release/rmz /tmp/ftzz`*             |  941.3 ± 19.9 |    925.9 |    993.1 |      34.6 |       889.1 | 1.00 ± 0.02 |
-| `./target/release/rm_stdlib /tmp/ftzz`         |  950.2 ± 18.3 |    930.6 |    985.8 |      39.5 |       884.2 | 1.01 ± 0.02 |
-| `rm -r /tmp/ftzz`                              |  969.0 ± 14.9 |    939.1 |    991.3 |      62.9 |       885.3 | 1.03 ± 0.02 |
-| `find /tmp/ftzz -delete`                       |  976.9 ± 13.9 |    958.5 |   1011.3 |      66.7 |       888.8 | 1.04 ± 0.02 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      |  1087.9 ± 9.6 |   1071.5 |   1102.6 |     100.0 |       924.2 | 1.16 ± 0.02 |
-| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         |  1209.8 ± 6.2 |   1200.4 |   1217.7 |     145.5 |      1047.3 | 1.29 ± 0.02 |
-| `./target/release/rm_rayon /tmp/ftzz`          | 1273.4 ± 14.4 |   1252.0 |   1297.3 |     100.0 |      2192.6 | 1.36 ± 0.02 |
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
+| `./target/release/rm_rayon /tmp/ftzz`          | 124.7 ± 1.5 |    121.6 |    127.1 |      30.0 |      1298.6 |        1.00 |
+| *`./target/release/rmz /tmp/ftzz`*             | 136.7 ± 3.1 |    131.1 |    143.8 |       4.1 |       126.0 | 1.10 ± 0.03 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 143.2 ± 5.3 |    133.1 |    147.8 |       8.8 |       128.4 | 1.15 ± 0.05 |
+| `rm -r /tmp/ftzz`                              | 157.4 ± 3.5 |    151.5 |    164.3 |      12.7 |       139.5 | 1.26 ± 0.03 |
+| `find /tmp/ftzz -delete`                       | 158.4 ± 3.3 |    152.4 |    162.8 |      13.5 |       139.1 | 1.27 ± 0.03 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 282.2 ± 3.5 |    278.4 |    289.6 |      42.2 |       195.8 | 2.26 ± 0.04 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 293.2 ± 4.2 |    287.4 |    299.5 |      25.6 |       261.7 | 2.35 ± 0.04 |
+| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         | 328.9 ± 4.0 |    321.4 |    335.0 |      63.2 |       261.1 | 2.64 ± 0.05 |
 
 #### `remove_100_000_files_0_bytes_5_files_per_dir.md`
 
-| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             | 0.814 ± 0.204 |   0.548 |   1.139 |    0.165 |      2.931 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          | 1.004 ± 0.099 |   0.853 |   1.171 |    0.384 |      3.453 | 1.23 ± 0.33 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 1.195 ± 0.013 |   1.173 |   1.208 |    0.109 |      1.034 | 1.47 ± 0.37 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.212 ± 0.024 |   1.181 |   1.267 |    0.110 |      1.036 | 1.49 ± 0.37 |
-| `find /tmp/ftzz -delete`                       | 1.372 ± 0.040 |   1.327 |   1.454 |    0.177 |      1.130 | 1.69 ± 0.42 |
-| `rm -r /tmp/ftzz`                              | 1.403 ± 0.029 |   1.367 |   1.445 |    0.190 |      1.154 | 1.72 ± 0.43 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.507 ± 0.026 |   1.462 |   1.565 |    0.193 |      1.224 | 1.85 ± 0.46 |
+| Command                                        |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|-------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |   34.4 ± 1.6 |     31.7 |     40.5 |      54.8 |       423.6 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |   58.8 ± 5.5 |     48.4 |     69.4 |      89.2 |       417.5 |  1.71 ± 0.18 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 252.7 ± 11.7 |    245.2 |    283.4 |      15.2 |       230.7 |  7.35 ± 0.49 |
+| `find /tmp/ftzz -delete`                       | 335.2 ± 35.8 |    305.0 |    413.8 |      44.9 |       284.4 |  9.75 ± 1.14 |
+| `rm -r /tmp/ftzz`                              |  342.4 ± 9.7 |    329.9 |    364.2 |      37.3 |       298.7 |  9.96 ± 0.55 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  427.0 ± 9.3 |    416.2 |    441.5 |      41.4 |       379.0 | 12.42 ± 0.65 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 457.2 ± 24.8 |    438.9 |    522.3 |      64.1 |       349.9 | 13.30 ± 0.96 |
 
-#### `remove_100_000_files_100M_bytes.md`
+#### `remove_100_000_files_1G_bytes.md`
 
-| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             | 0.541 ± 0.138 |   0.363 |   0.720 |    0.062 |      2.298 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          | 0.672 ± 0.196 |   0.449 |   0.993 |    0.153 |      2.507 | 1.24 ± 0.48 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 1.013 ± 0.007 |   1.001 |   1.024 |    0.045 |      0.939 | 1.87 ± 0.48 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.014 ± 0.009 |   1.004 |   1.036 |    0.044 |      0.941 | 1.87 ± 0.48 |
-| `find /tmp/ftzz -delete`                       | 1.031 ± 0.008 |   1.019 |   1.047 |    0.055 |      0.949 | 1.91 ± 0.48 |
-| `rm -r /tmp/ftzz`                              | 1.048 ± 0.042 |   1.015 |   1.163 |    0.048 |      0.965 | 1.94 ± 0.50 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.224 ± 0.017 |   1.204 |   1.261 |    0.101 |      1.057 | 2.26 ± 0.58 |
+| Command                                        |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|-------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |   47.9 ± 5.1 |     43.0 |     62.4 |      12.7 |       578.2 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  69.8 ± 11.1 |     51.9 |     92.5 |      48.0 |       572.5 |  1.46 ± 0.28 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  334.1 ± 6.9 |    323.4 |    349.1 |      16.1 |       308.9 |  6.97 ± 0.76 |
+| `find /tmp/ftzz -delete`                       |  355.2 ± 7.9 |    347.1 |    375.3 |      30.2 |       316.5 |  7.41 ± 0.81 |
+| `rm -r /tmp/ftzz`                              | 396.9 ± 54.8 |    356.1 |    532.2 |      26.0 |       363.6 |  8.28 ± 1.44 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      |  503.4 ± 4.7 |    497.3 |    508.8 |      46.7 |       412.4 | 10.50 ± 1.12 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 523.0 ± 11.8 |    505.4 |    543.7 |      37.9 |       478.3 | 10.91 ± 1.19 |
 
-#### `remove_100_000_files_100M_bytes_0_depth.md`
+#### `remove_100_000_files_1G_bytes_0_depth.md`
 
-| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             | 1.155 ± 0.010 |   1.143 |   1.172 |    0.032 |      1.098 |        1.00 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 1.162 ± 0.010 |   1.150 |   1.182 |    0.042 |      1.095 | 1.01 ± 0.01 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.166 ± 0.014 |   1.150 |   1.194 |    0.041 |      1.096 | 1.01 ± 0.01 |
-| `rm -r /tmp/ftzz`                              | 1.190 ± 0.007 |   1.179 |   1.205 |    0.062 |      1.107 | 1.03 ± 0.01 |
-| `find /tmp/ftzz -delete`                       | 1.192 ± 0.005 |   1.184 |   1.200 |    0.063 |      1.109 | 1.03 ± 0.01 |
-| `./target/release/rm_rayon /tmp/ftzz`          | 1.246 ± 0.010 |   1.234 |   1.269 |    0.112 |      2.736 | 1.08 ± 0.01 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.300 ± 0.008 |   1.286 |   1.311 |    0.100 |      1.148 | 1.13 ± 0.01 |
-| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         | 1.434 ± 0.006 |   1.426 |   1.447 |    0.146 |      1.272 | 1.24 ± 0.01 |
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
+| `./target/release/rm_rayon /tmp/ftzz`          | 140.1 ± 3.0 |    135.8 |    144.8 |      42.7 |      1596.3 |        1.00 |
+| *`./target/release/rmz /tmp/ftzz`*             | 296.1 ± 2.4 |    293.6 |    300.6 |      14.1 |       273.9 | 2.11 ± 0.05 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 301.7 ± 4.4 |    294.8 |    309.7 |      11.4 |       282.5 | 2.15 ± 0.06 |
+| `rm -r /tmp/ftzz`                              | 316.8 ± 2.2 |    311.9 |    319.8 |      22.4 |       286.2 | 2.26 ± 0.05 |
+| `find /tmp/ftzz -delete`                       | 321.5 ± 2.9 |    316.7 |    325.4 |      21.7 |       292.3 | 2.30 ± 0.05 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 434.8 ± 3.0 |    431.1 |    438.9 |      49.8 |       338.9 | 3.10 ± 0.07 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 452.3 ± 3.2 |    447.9 |    458.8 |      28.8 |       416.4 | 3.23 ± 0.07 |
+| `perl -e 'for(</tmp/ftzz/*>){unlink}'`         | 486.7 ± 5.8 |    477.1 |    493.7 |      65.0 |       415.2 | 3.47 ± 0.08 |
 
-#### `remove_100_000_files_100M_bytes_5_files_per_dir.md`
+#### `remove_100_000_files_1G_bytes_5_files_per_dir.md`
 
-| Command                                        |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:-----------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             | 0.649 ± 0.063 |   0.593 |   0.769 |    0.134 |      2.922 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          | 0.912 ± 0.143 |   0.749 |   1.165 |    0.324 |      3.599 | 1.41 ± 0.26 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 1.444 ± 0.032 |   1.412 |   1.517 |    0.111 |      1.279 | 2.23 ± 0.22 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 1.453 ± 0.020 |   1.430 |   1.500 |    0.109 |      1.284 | 2.24 ± 0.22 |
-| `find /tmp/ftzz -delete`                       | 1.593 ± 0.024 |   1.573 |   1.656 |    0.189 |      1.351 | 2.45 ± 0.24 |
-| `rm -r /tmp/ftzz`                              | 1.636 ± 0.015 |   1.612 |   1.665 |    0.187 |      1.392 | 2.52 ± 0.25 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 1.754 ± 0.024 |   1.730 |   1.798 |    0.198 |      1.479 | 2.70 ± 0.26 |
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |  49.4 ± 1.8 |     47.5 |     53.2 |      35.0 |       682.1 |         1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  80.1 ± 5.2 |     67.5 |     91.7 |      95.7 |       677.2 |  1.62 ± 0.12 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 411.7 ± 3.5 |    406.7 |    418.7 |      23.9 |       377.3 |  8.33 ± 0.30 |
+| `find /tmp/ftzz -delete`                       | 469.9 ± 3.4 |    464.7 |    476.3 |      48.7 |       412.3 |  9.51 ± 0.35 |
+| `rm -r /tmp/ftzz`                              | 502.1 ± 5.9 |    496.4 |    513.8 |      48.2 |       445.6 | 10.16 ± 0.38 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 584.3 ± 5.0 |    576.0 |    594.6 |      45.9 |       530.7 | 11.83 ± 0.43 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 609.4 ± 3.2 |    604.1 |    613.6 |      75.7 |       490.6 | 12.33 ± 0.44 |
 
 #### `remove_10_000_files_0_bytes.md`
 
+| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/rmz /tmp/ftzz`*             |   4.3 ± 0.8 |      3.4 |      7.4 |       6.4 |        32.0 |         1.00 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  19.1 ± 1.3 |     16.9 |     27.2 |       2.0 |        16.9 |  4.44 ± 0.83 |
+| `find /tmp/ftzz -delete`                       |  22.8 ± 1.5 |     20.9 |     27.6 |       2.5 |        19.8 |  5.28 ± 0.98 |
+| `rm -r /tmp/ftzz`                              |  24.2 ± 1.4 |     22.5 |     28.7 |       2.5 |        21.4 |  5.62 ± 1.03 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  36.7 ± 2.2 |     32.6 |     43.2 |       3.6 |        32.4 |  8.50 ± 1.56 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 39.4 ± 15.3 |      5.0 |     85.5 |       9.3 |        51.2 |  9.14 ± 3.89 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      |  85.4 ± 8.5 |     76.2 |    106.7 |      11.2 |        36.7 | 19.79 ± 3.97 |
+
+#### `remove_10_000_files_1G_bytes.md`
+
 | Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
 |:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             |  45.0 ± 1.6 |     43.4 |     48.1 |      11.3 |       210.8 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  55.4 ± 1.9 |     52.5 |     59.3 |      24.3 |       223.5 | 1.23 ± 0.06 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 108.4 ± 0.8 |    106.4 |    109.5 |       8.8 |        97.3 | 2.41 ± 0.09 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 109.5 ± 4.0 |    106.5 |    126.0 |       9.6 |        96.9 | 2.43 ± 0.12 |
-| `find /tmp/ftzz -delete`                       | 119.6 ± 2.2 |    117.2 |    124.1 |      15.4 |       101.4 | 2.66 ± 0.11 |
-| `rm -r /tmp/ftzz`                              | 120.1 ± 0.9 |    118.7 |    121.7 |      15.7 |       101.8 | 2.67 ± 0.10 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 177.7 ± 0.7 |    176.4 |    179.1 |      18.2 |       118.3 | 3.95 ± 0.14 |
-
-#### `remove_10_000_files_100M_bytes.md`
-
-| Command                                        |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:-----------------------------------------------|------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/rmz /tmp/ftzz`*             |  51.8 ± 1.6 |     49.2 |     54.6 |      10.4 |       288.9 |        1.00 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  62.8 ± 2.6 |     59.7 |     70.4 |      24.1 |       306.4 | 1.21 ± 0.06 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 154.2 ± 0.7 |    152.8 |    155.4 |       8.8 |       141.0 | 2.98 ± 0.09 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 154.3 ± 1.3 |    152.3 |    156.7 |      10.1 |       139.7 | 2.98 ± 0.09 |
-| `find /tmp/ftzz -delete`                       | 164.7 ± 1.2 |    161.6 |    165.9 |      13.9 |       145.1 | 3.18 ± 0.10 |
-| `rm -r /tmp/ftzz`                              | 165.9 ± 0.8 |    164.4 |    166.8 |      16.5 |       144.7 | 3.20 ± 0.10 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 226.1 ± 5.2 |    223.5 |    240.7 |      20.0 |       161.8 | 4.36 ± 0.17 |
+| *`./target/release/rmz /tmp/ftzz`*             |  20.7 ± 0.6 |     19.3 |     22.7 |       3.3 |       264.5 |        1.00 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 44.4 ± 15.5 |     20.4 |     79.6 |       7.6 |       242.9 | 2.15 ± 0.75 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 109.3 ± 4.5 |    106.4 |    126.2 |       1.3 |       107.2 | 5.29 ± 0.27 |
+| `find /tmp/ftzz -delete`                       | 111.3 ± 1.7 |    107.7 |    114.6 |       4.6 |       106.1 | 5.38 ± 0.18 |
+| `rm -r /tmp/ftzz`                              | 113.9 ± 3.7 |    111.6 |    128.1 |       4.2 |       109.2 | 5.51 ± 0.24 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 125.4 ± 3.6 |    122.1 |    134.8 |       5.0 |       119.7 | 6.06 ± 0.25 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 165.1 ± 1.4 |    162.2 |    167.8 |      11.0 |       115.2 | 7.98 ± 0.24 |
 
 #### `remove_10_files_0_bytes.md`
 
 | Command                                        |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
 |:-----------------------------------------------|-----------:|---------:|---------:|----------:|------------:|-------------:|
-| `./target/release/rm_remove_dir_all /tmp/ftzz` |  1.1 ± 0.0 |      1.0 |      1.2 |       0.3 |         0.7 |         1.00 |
-| `./target/release/rm_stdlib /tmp/ftzz`         |  1.1 ± 0.0 |      1.0 |      1.2 |       0.2 |         0.8 |  1.00 ± 0.03 |
-| *`./target/release/rmz /tmp/ftzz`*             |  1.1 ± 0.1 |      1.0 |      1.4 |       0.6 |         1.4 |  1.01 ± 0.06 |
-| `./target/release/rm_rayon /tmp/ftzz`          |  1.4 ± 0.1 |      1.2 |      1.6 |       1.1 |         2.6 |  1.30 ± 0.07 |
-| `rm -r /tmp/ftzz`                              |  3.6 ± 0.1 |      3.4 |      4.3 |       1.0 |         2.4 |  3.33 ± 0.11 |
-| `find /tmp/ftzz -delete`                       |  4.2 ± 0.1 |      3.9 |      5.6 |       1.1 |         2.5 |  3.94 ± 0.16 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 46.8 ± 0.3 |     45.1 |     47.1 |       2.2 |         5.3 | 43.90 ± 1.07 |
+| `./target/release/rm_stdlib /tmp/ftzz`         |  0.7 ± 0.1 |      0.6 |      2.3 |       0.6 |         0.1 |         1.00 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` |  0.8 ± 0.1 |      0.7 |      2.5 |       0.6 |         0.1 |  1.09 ± 0.15 |
+| *`./target/release/rmz /tmp/ftzz`*             |  0.9 ± 0.1 |      0.8 |      2.0 |       1.2 |         0.3 |  1.34 ± 0.17 |
+| `rm -r /tmp/ftzz`                              |  1.0 ± 0.1 |      0.8 |      1.3 |       0.7 |         0.2 |  1.38 ± 0.17 |
+| `find /tmp/ftzz -delete`                       |  1.2 ± 0.1 |      1.0 |      1.7 |       0.8 |         0.2 |  1.66 ± 0.20 |
+| `./target/release/rm_rayon /tmp/ftzz`          |  1.4 ± 0.2 |      1.2 |      3.4 |       3.6 |         1.3 |  2.06 ± 0.30 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 46.4 ± 2.9 |     43.9 |     54.2 |       5.3 |         3.5 | 66.76 ± 7.71 |
 
-#### `remove_10_files_100M_bytes.md`
+#### `remove_10_files_1G_bytes.md`
 
 | Command                                        |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
 |:-----------------------------------------------|-----------:|---------:|---------:|----------:|------------:|------------:|
-| `./target/release/rm_rayon /tmp/ftzz`          |  8.2 ± 0.2 |      7.8 |      9.0 |       1.3 |        49.6 |        1.00 |
-| *`./target/release/rmz /tmp/ftzz`*             |  9.0 ± 0.3 |      8.4 |      9.6 |       0.6 |        30.7 | 1.10 ± 0.05 |
-| `./target/release/rm_stdlib /tmp/ftzz`         | 25.1 ± 0.2 |     24.6 |     26.2 |       0.2 |        24.6 | 3.05 ± 0.10 |
-| `./target/release/rm_remove_dir_all /tmp/ftzz` | 25.1 ± 0.1 |     24.8 |     25.4 |       0.3 |        24.5 | 3.05 ± 0.09 |
-| `rm -r /tmp/ftzz`                              | 25.6 ± 1.2 |     25.1 |     33.9 |       0.5 |        24.7 | 3.11 ± 0.17 |
-| `find /tmp/ftzz -delete`                       | 26.3 ± 0.7 |     25.9 |     31.4 |       0.5 |        24.9 | 3.19 ± 0.13 |
-| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 75.8 ± 3.1 |     69.9 |     82.0 |       1.8 |        34.1 | 9.20 ± 0.47 |
+| `./target/release/rm_rayon /tmp/ftzz`          | 16.8 ± 1.9 |     13.4 |     21.1 |       1.3 |        68.6 |        1.00 |
+| *`./target/release/rmz /tmp/ftzz`*             | 26.3 ± 1.4 |     24.7 |     31.6 |       0.2 |        54.2 | 1.56 ± 0.20 |
+| `./target/release/rm_remove_dir_all /tmp/ftzz` | 52.3 ± 3.7 |     47.7 |     67.2 |       0.0 |        52.1 | 3.11 ± 0.42 |
+| `rm -r /tmp/ftzz`                              | 52.5 ± 2.5 |     49.7 |     63.8 |       0.1 |        52.1 | 3.12 ± 0.38 |
+| `find /tmp/ftzz -delete`                       | 52.5 ± 1.8 |     50.3 |     60.2 |       0.2 |        52.1 | 3.12 ± 0.37 |
+| `./target/release/rm_stdlib /tmp/ftzz`         | 54.4 ± 5.1 |     50.4 |     75.5 |       0.1 |        53.9 | 3.24 ± 0.47 |
+| `rsync --delete -r /tmp/empty/ /tmp/ftzz`      | 95.8 ± 1.2 |     93.5 |     97.6 |       2.3 |        55.1 | 5.70 ± 0.65 |
 
 ## Copy
 
@@ -220,7 +230,7 @@ git clone https://github.com/wheybags/wcp.git && mkdir wcp/build && (cd wcp/buil
 ### Run
 
 ```bash
-for num_bytes in {0,100M}; do
+for num_bytes in {0,1G}; do
   for num_files in {10,10_000,100_000,1M}; do
     hyperfine --warmup 3 -N \
       --export-markdown "benches/copy_${num_files}_files_${num_bytes}_bytes.md" \
@@ -270,9 +280,9 @@ for num_bytes in {0,100M}; do
 done
 
 hyperfine --warmup 3 -N \
-  --export-markdown "benches/copy_100_000_files_100M_bytes_0_depth_0_entropy.md" \
-  --export-json "benches/copy_100_000_files_100M_bytes_0_depth_0_entropy.json" \
-  --setup "ftzz g -n 100_000 -b 100M -d 0 --fill-byte 0 /tmp/ftzz" \
+  --export-markdown "benches/copy_100_000_files_1G_bytes_0_depth_0_entropy.md" \
+  --export-json "benches/copy_100_000_files_1G_bytes_0_depth_0_entropy.json" \
+  --setup "ftzz g -n 100_000 -b 1G -d 0 --fill-byte 0 /tmp/ftzz" \
   --prepare "rm -rf /tmp/ftzzz" --cleanup "rm -r /tmp/ftzz" \
     "cp -r /tmp/ftzz /tmp/ftzzz" \
     "fcp /tmp/ftzz /tmp/ftzzz" \
@@ -287,175 +297,184 @@ hyperfine --warmup 3 -N \
 
 ### Results
 
-> Note: my benchmarking machine doesn't have io_uring enabled, so I was not able to include results
-> with `wcp`. That said, I ran a few quick benches on my personal machine against `cpz` and found it
-> to be faster than `wcp`.
+#### `copy_1M_files_0_bytes.md`
 
-#### `copy_10_files_0_bytes.md`
+| Command                                                                             |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:------------------------------------------------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |  0.565 ± 0.010 |   0.551 |   0.579 |    0.381 |      7.453 |         1.00 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  0.911 ± 0.017 |   0.885 |   0.935 |    1.369 |     12.066 |  1.61 ± 0.04 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |  1.044 ± 0.020 |   1.007 |   1.084 |    1.774 |     13.847 |  1.85 ± 0.05 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |  2.058 ± 0.073 |   1.978 |   2.228 |    1.830 |      8.296 |  3.64 ± 0.14 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  3.682 ± 0.072 |   3.552 |   3.792 |    1.750 |      3.893 |  6.52 ± 0.17 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              |  4.641 ± 0.047 |   4.537 |   4.693 |    2.859 |      3.503 |  8.22 ± 0.17 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  5.937 ± 0.030 |   5.889 |   5.978 |    0.691 |      5.242 | 10.51 ± 0.19 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  6.439 ± 0.071 |   6.366 |   6.589 |    0.810 |      5.623 | 11.40 ± 0.24 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 13.092 ± 0.147 |  12.866 |  13.291 |    2.657 |     11.959 | 23.19 ± 0.48 |
 
-| Command                                                                                            |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
-|:---------------------------------------------------------------------------------------------------|-----------:|---------:|---------:|----------:|------------:|-------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |  1.9 ± 0.1 |      1.7 |      2.4 |       0.8 |         2.6 |         1.00 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |  2.5 ± 0.3 |      2.1 |      3.1 |       0.6 |         1.7 |  1.33 ± 0.17 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |  3.0 ± 0.3 |      2.0 |      3.7 |       2.6 |         6.5 |  1.61 ± 0.20 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |  3.7 ± 0.2 |      3.2 |      4.3 |       3.3 |         7.4 |  1.96 ± 0.16 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |  3.9 ± 0.4 |      3.2 |      4.4 |       1.1 |         2.7 |  2.09 ± 0.24 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |  3.9 ± 0.2 |      3.6 |      4.8 |       2.5 |         4.9 |  2.09 ± 0.17 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  7.8 ± 1.4 |      6.9 |     10.8 |       5.1 |         6.5 |  4.14 ± 0.79 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 48.6 ± 0.2 |     48.1 |     49.0 |       2.9 |         6.9 | 25.82 ± 1.43 |
+#### `copy_1M_files_1G_bytes.md`
 
-#### `copy_10_000_files_0_bytes.md`
-
-| Command                                                                                            |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
-|:---------------------------------------------------------------------------------------------------|-------------:|---------:|---------:|----------:|------------:|------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |   48.6 ± 1.1 |     46.8 |     50.6 |      42.7 |       263.6 |        1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |   63.9 ± 1.0 |     61.8 |     65.6 |      83.5 |       344.2 | 1.32 ± 0.04 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |   66.4 ± 1.0 |     64.0 |     68.0 |      92.3 |       353.3 | 1.37 ± 0.04 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |  110.8 ± 4.8 |    103.4 |    120.5 |      84.4 |       392.9 | 2.28 ± 0.11 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  174.4 ± 1.7 |    171.9 |    176.9 |      59.1 |       175.9 | 3.59 ± 0.09 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |  239.7 ± 1.4 |    238.0 |    242.6 |      48.9 |       185.3 | 4.94 ± 0.12 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 265.9 ± 38.7 |    227.4 |    311.6 |      45.5 |       188.8 | 5.48 ± 0.81 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        |  446.4 ± 3.4 |    442.4 |    452.2 |     108.2 |       298.2 | 9.19 ± 0.23 |
+| Command                                                                             |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:------------------------------------------------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |  0.860 ± 0.016 |   0.839 |   0.882 |    0.436 |     11.505 |         1.00 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  1.177 ± 0.015 |   1.156 |   1.201 |    1.571 |     15.999 |  1.37 ± 0.03 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |  1.312 ± 0.029 |   1.255 |   1.355 |    1.983 |     17.511 |  1.53 ± 0.04 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |  2.691 ± 0.027 |   2.641 |   2.730 |    1.939 |     10.653 |  3.13 ± 0.07 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  5.678 ± 0.062 |   5.619 |   5.817 |    2.321 |      7.612 |  6.60 ± 0.14 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  8.284 ± 0.064 |   8.232 |   8.430 |    0.821 |      7.452 |  9.63 ± 0.20 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  8.414 ± 0.079 |   8.305 |   8.540 |    1.037 |      7.362 |  9.78 ± 0.21 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              |  9.998 ± 0.155 |   9.788 |  10.284 |    2.738 |     16.684 | 11.62 ± 0.28 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 13.427 ± 0.213 |  13.219 |  13.839 |    3.752 |     15.649 | 15.61 ± 0.39 |
 
 #### `copy_100_000_files_0_bytes.md`
 
-| Command                                                                                            |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      | 0.357 ± 0.009 |   0.347 |   0.374 |    0.266 |      1.976 |        1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   | 0.467 ± 0.005 |   0.462 |   0.476 |    0.525 |      2.607 | 1.31 ± 0.03 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 0.716 ± 0.010 |   0.705 |   0.734 |    0.626 |      4.207 | 2.01 ± 0.06 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 0.971 ± 0.017 |   0.947 |   0.992 |    0.552 |      3.389 | 2.72 ± 0.08 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 1.339 ± 0.023 |   1.302 |   1.372 |    0.401 |      1.298 | 3.75 ± 0.11 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 1.672 ± 0.015 |   1.651 |   1.699 |    0.285 |      1.355 | 4.68 ± 0.12 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 1.772 ± 0.007 |   1.763 |   1.784 |    0.311 |      1.428 | 4.97 ± 0.12 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 2.897 ± 0.022 |   2.870 |   2.922 |    0.665 |      2.174 | 8.12 ± 0.21 |
-
-#### `copy_1M_files_0_bytes.md`
-
-| Command                                                                                            |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |  5.285 ± 0.513 |   4.963 |   6.377 |    3.209 |     28.408 |        1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |  7.089 ± 0.579 |   6.502 |   8.005 |    6.581 |     37.199 | 1.34 ± 0.17 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 14.600 ± 0.128 |  14.508 |  14.944 |    6.550 |     48.207 | 2.76 ± 0.27 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 14.997 ± 0.079 |  14.877 |  15.121 |    6.559 |     75.957 | 2.84 ± 0.28 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 18.659 ± 0.155 |  18.467 |  18.940 |    4.751 |     18.415 | 3.53 ± 0.34 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 22.796 ± 0.103 |  22.547 |  22.909 |    3.457 |     18.937 | 4.31 ± 0.42 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 23.958 ± 0.119 |  23.787 |  24.198 |    3.885 |     19.659 | 4.53 ± 0.44 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 34.984 ± 0.132 |  34.806 |  35.188 |    7.984 |     28.287 | 6.62 ± 0.64 |
-
-#### `copy_10_files_100M_bytes.md`
-
-| Command                                                                                            |   Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |       Relative |
-|:---------------------------------------------------------------------------------------------------|------------:|---------:|---------:|----------:|------------:|---------------:|
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |   1.6 ± 0.3 |      1.3 |      4.0 |       1.3 |         3.5 |           1.00 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |   1.9 ± 0.3 |      1.8 |      9.7 |       0.5 |         1.3 |    1.21 ± 0.29 |
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |   2.1 ± 0.3 |      1.8 |      9.5 |       0.9 |         3.1 |    1.32 ± 0.32 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |   2.9 ± 0.5 |      2.2 |      4.2 |       2.6 |         6.3 |    1.83 ± 0.46 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |   3.5 ± 0.3 |      3.1 |      5.1 |       2.3 |         4.9 |    2.23 ± 0.48 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |   3.7 ± 0.1 |      3.5 |      4.0 |       0.8 |         2.7 |    2.39 ± 0.48 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 145.8 ± 0.9 |    144.1 |    147.3 |      40.6 |       216.7 |  93.50 ± 18.40 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 518.0 ± 1.6 |    516.4 |    521.4 |     713.0 |       174.8 | 332.20 ± 65.37 |
-
-#### `copy_10_000_files_100M_bytes.md`
-
-| Command                                                                                            |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|---------:|---------:|----------:|------------:|-------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |    75.0 ± 2.0 |     72.0 |     78.1 |      48.4 |       453.3 |         1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |    91.6 ± 2.3 |     88.2 |     96.0 |      82.0 |       534.9 |  1.22 ± 0.04 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |    97.1 ± 2.9 |     93.2 |    102.3 |      97.4 |       552.0 |  1.29 ± 0.05 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |   139.9 ± 6.0 |    130.4 |    151.6 |      90.7 |       495.1 |  1.87 ± 0.09 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |   326.2 ± 2.5 |    322.5 |    329.6 |      48.2 |       269.5 |  4.35 ± 0.12 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |   338.4 ± 2.1 |    334.8 |    341.3 |      48.6 |       281.8 |  4.51 ± 0.12 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  340.6 ± 19.7 |    329.8 |    395.6 |     112.5 |       402.9 |  4.54 ± 0.29 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 1488.0 ± 41.8 |   1422.8 |   1552.6 |     619.6 |       892.3 | 19.84 ± 0.76 |
-
-#### `copy_100_000_files_100M_bytes.md`
-
-| Command                                                                                            |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
-|:---------------------------------------------------------------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|-------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |  0.751 ± 0.136 |   0.617 |   1.068 |    0.318 |      3.768 |         1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |  0.828 ± 0.074 |   0.752 |   1.003 |    0.550 |      4.302 |  1.10 ± 0.22 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |  0.958 ± 0.030 |   0.931 |   1.025 |    0.709 |      5.300 |  1.28 ± 0.23 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |  1.135 ± 0.013 |   1.113 |   1.151 |    0.616 |      3.997 |  1.51 ± 0.27 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  1.835 ± 0.047 |   1.792 |   1.942 |    0.558 |      1.960 |  2.44 ± 0.45 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |  2.524 ± 0.021 |   2.486 |   2.549 |    0.295 |      2.170 |  3.36 ± 0.61 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |  2.610 ± 0.022 |   2.571 |   2.638 |    0.330 |      2.221 |  3.48 ± 0.63 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 10.099 ± 0.161 |   9.891 |  10.500 |    1.277 |      6.656 | 13.45 ± 2.45 |
-
-#### `copy_1M_files_100M_bytes.md`
-
-| Command                                                                                            |        Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
-|:---------------------------------------------------------------------------------------------------|----------------:|--------:|--------:|---------:|-----------:|-------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |   8.840 ± 0.210 |   8.488 |   9.176 |    3.759 |     47.928 |         1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |  10.485 ± 0.179 |  10.175 |  10.744 |    6.621 |     55.259 |  1.19 ± 0.03 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |  16.481 ± 0.156 |  16.294 |  16.735 |    7.566 |     57.508 |  1.86 ± 0.05 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |  16.924 ± 0.103 |  16.805 |  17.172 |    7.077 |     85.419 |  1.91 ± 0.05 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  29.514 ± 3.214 |  27.382 |  36.505 |    7.532 |     28.394 |  3.34 ± 0.37 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |  35.050 ± 0.149 |  34.878 |  35.297 |    3.618 |     30.658 |  3.97 ± 0.10 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |  35.533 ± 0.135 |  35.257 |  35.723 |    4.079 |     30.679 |  4.02 ± 0.10 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 103.297 ± 1.387 | 102.166 | 106.951 |   11.423 |     63.319 | 11.69 ± 0.32 |
+| Command                                                                             |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:------------------------------------------------------------------------------------|--------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |    57.2 ± 1.0 |     55.9 |     59.2 |      33.3 |       712.6 |         1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |   100.9 ± 4.0 |     93.2 |    104.1 |     187.0 |      1274.0 |  1.76 ± 0.08 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  117.0 ± 10.1 |    103.4 |    132.8 |     133.0 |      1172.3 |  2.05 ± 0.18 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |   196.3 ± 4.2 |    192.3 |    204.1 |     196.1 |       762.0 |  3.43 ± 0.09 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |   361.4 ± 2.6 |    357.8 |    365.7 |     172.8 |       384.9 |  6.32 ± 0.12 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              |   532.7 ± 8.0 |    515.5 |    541.6 |     360.1 |       364.1 |  9.31 ± 0.21 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |   587.9 ± 3.5 |    582.5 |    591.7 |      79.3 |       506.8 | 10.28 ± 0.19 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |   639.7 ± 3.0 |    634.6 |    644.3 |      85.9 |       553.1 | 11.18 ± 0.20 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 1479.2 ± 11.2 |   1467.2 |   1498.2 |     239.1 |      1204.3 | 25.86 ± 0.48 |
 
 #### `copy_100_000_files_0_bytes_0_depth.md`
 
-| Command                                                                                            |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 1.266 ± 0.021 |   1.245 |   1.320 |    0.521 |      4.012 |        1.00 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 1.420 ± 0.011 |   1.408 |   1.438 |    0.456 |      7.234 | 1.12 ± 0.02 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   | 1.434 ± 0.004 |   1.429 |   1.439 |    0.431 |      7.467 | 1.13 ± 0.02 |
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      | 1.558 ± 0.013 |   1.542 |   1.582 |    0.188 |      1.336 | 1.23 ± 0.02 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 1.595 ± 0.018 |   1.571 |   1.636 |    0.395 |      1.563 | 1.26 ± 0.03 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 1.845 ± 0.009 |   1.833 |   1.866 |    0.285 |      1.527 | 1.46 ± 0.03 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 1.954 ± 0.007 |   1.944 |   1.963 |    0.311 |      1.609 | 1.54 ± 0.03 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 2.419 ± 0.025 |   2.375 |   2.466 |    0.647 |      2.316 | 1.91 ± 0.04 |
-
-#### `copy_100_000_files_100M_bytes_0_depth.md`
-
-| Command                                                                                            |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 1.363 ± 0.012 |   1.349 |   1.383 |    0.591 |      4.809 |        1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   | 1.510 ± 0.014 |   1.495 |   1.543 |    0.455 |      7.824 | 1.11 ± 0.01 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 1.523 ± 0.013 |   1.503 |   1.542 |    0.498 |      7.600 | 1.12 ± 0.01 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 2.090 ± 0.032 |   2.047 |   2.136 |    0.555 |      2.218 | 1.53 ± 0.03 |
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      | 2.361 ± 0.018 |   2.340 |   2.403 |    0.231 |      2.067 | 1.73 ± 0.02 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 2.662 ± 0.019 |   2.635 |   2.703 |    0.328 |      2.269 | 1.95 ± 0.02 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 2.770 ± 0.062 |   2.728 |   2.910 |    0.292 |      2.401 | 2.03 ± 0.05 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 8.267 ± 0.145 |   8.117 |   8.606 |    1.204 |      5.029 | 6.07 ± 0.12 |
-
-#### `copy_100_000_files_100M_bytes_0_depth_0_entropy.md`
-
-| Command                                                                                            |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 1.362 ± 0.016 |   1.342 |   1.398 |    0.599 |      4.780 |        1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   | 1.510 ± 0.011 |   1.489 |   1.525 |    0.461 |      7.893 | 1.11 ± 0.02 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 1.557 ± 0.058 |   1.516 |   1.717 |    0.504 |      7.664 | 1.14 ± 0.05 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 2.075 ± 0.021 |   2.048 |   2.119 |    0.547 |      2.211 | 1.52 ± 0.02 |
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      | 2.385 ± 0.015 |   2.363 |   2.411 |    0.233 |      2.093 | 1.75 ± 0.02 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 2.570 ± 0.014 |   2.552 |   2.591 |    0.292 |      2.218 | 1.89 ± 0.02 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 2.661 ± 0.017 |   2.628 |   2.693 |    0.324 |      2.276 | 1.95 ± 0.03 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 8.242 ± 0.131 |   8.085 |   8.496 |    1.215 |      4.989 | 6.05 ± 0.12 |
+| Command                                                                             |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:------------------------------------------------------------------------------------|-------------:|---------:|---------:|----------:|------------:|------------:|
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |  172.3 ± 5.4 |    166.7 |    183.6 |     155.7 |       672.2 |        1.00 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  193.3 ± 2.7 |    190.2 |    198.1 |      99.3 |      2405.8 | 1.12 ± 0.04 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |  208.6 ± 2.0 |    206.7 |    213.0 |     105.3 |      2343.8 | 1.21 ± 0.04 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  324.9 ± 3.2 |    320.3 |    329.2 |     163.8 |       323.0 | 1.89 ± 0.06 |
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |  383.3 ± 2.1 |    380.4 |    386.7 |      24.0 |       358.9 | 2.22 ± 0.07 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 440.0 ± 10.2 |    421.9 |    459.3 |     291.2 |       296.4 | 2.55 ± 0.10 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  496.3 ± 5.3 |    486.7 |    503.7 |      58.3 |       437.1 | 2.88 ± 0.09 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  533.5 ± 2.7 |    530.1 |    538.2 |      70.3 |       462.5 | 3.10 ± 0.10 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         |  945.0 ± 6.7 |    935.2 |    954.8 |     203.4 |      1021.8 | 5.48 ± 0.18 |
 
 #### `copy_100_000_files_0_bytes_5_files_per_dir.md`
 
-| Command                                                                                            |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
-|:---------------------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         | 0.627 ± 0.009 |   0.617 |   0.643 |    0.852 |      3.414 |        1.00 |
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      | 0.646 ± 0.039 |   0.587 |   0.723 |    0.424 |      2.935 | 1.03 ± 0.06 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   | 0.647 ± 0.054 |   0.600 |   0.753 |    0.753 |      3.421 | 1.03 ± 0.09 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      | 1.005 ± 0.030 |   0.952 |   1.048 |    0.940 |      3.642 | 1.60 ± 0.05 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> | 1.727 ± 0.025 |   1.703 |   1.777 |    0.585 |      1.757 | 2.75 ± 0.06 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       | 2.243 ± 0.020 |   2.206 |   2.263 |    0.396 |      1.805 | 3.58 ± 0.06 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  | 2.301 ± 0.009 |   2.283 |   2.310 |    0.432 |      1.825 | 3.67 ± 0.05 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 3.865 ± 0.031 |   3.808 |   3.901 |    0.988 |      2.847 | 6.16 ± 0.10 |
+| Command                                                                             |     Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:------------------------------------------------------------------------------------|--------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |    68.1 ± 2.2 |     63.1 |     70.9 |      59.5 |       919.6 |         1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |   100.0 ± 1.4 |     98.5 |    103.4 |     217.1 |      1259.6 |  1.47 ± 0.05 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  127.8 ± 10.7 |    108.7 |    145.0 |     201.0 |      1309.7 |  1.88 ± 0.17 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |   343.7 ± 2.9 |    339.5 |    349.0 |     725.0 |       837.8 |  5.05 ± 0.17 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |   404.5 ± 4.4 |    397.0 |    410.3 |     225.3 |       473.7 |  5.94 ± 0.20 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |   654.8 ± 7.9 |    637.3 |    666.7 |      84.4 |       569.9 |  9.61 ± 0.33 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              |  776.3 ± 19.3 |    746.9 |    800.0 |     651.9 |       556.5 | 11.40 ± 0.46 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |   821.4 ± 8.8 |    808.5 |    841.4 |     105.3 |       714.1 | 12.06 ± 0.40 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 1689.6 ± 17.0 |   1660.3 |   1710.3 |     403.3 |      1264.4 | 24.81 ± 0.82 |
 
-#### `copy_100_000_files_100M_bytes_5_files_per_dir.md`
+#### `copy_100_000_files_1G_bytes.md`
 
-| Command                                                                                            |       Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
-|:---------------------------------------------------------------------------------------------------|---------------:|--------:|--------:|---------:|-----------:|-------------:|
-| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                                      |  1.031 ± 0.065 |   0.924 |   1.115 |    0.495 |      4.988 |         1.00 |
-| `./target/release/rayon_cp /tmp/ftzz /tmp/ftzzz`                                                   |  1.041 ± 0.080 |   0.953 |   1.175 |    0.788 |      5.488 |  1.01 ± 0.10 |
-| `fcp /tmp/ftzz /tmp/ftzzz`                                                                         |  1.080 ± 0.132 |   0.976 |   1.361 |    0.902 |      5.550 |  1.05 ± 0.14 |
-| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                                      |  1.327 ± 0.037 |   1.296 |   1.410 |    0.872 |      4.829 |  1.29 ± 0.09 |
-| <code>sh -c '(cd /tmp/ftzz; tar cf - .) &#124; (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'</code> |  2.311 ± 0.043 |   2.249 |   2.407 |    0.801 |      2.524 |  2.24 ± 0.15 |
-| `./target/release/stdlib_cp /tmp/ftzz /tmp/ftzzz`                                                  |  3.255 ± 0.022 |   3.230 |   3.287 |    0.455 |      2.718 |  3.16 ± 0.20 |
-| `cp -r /tmp/ftzz /tmp/ftzzz`                                                                       |  3.309 ± 0.020 |   3.281 |   3.338 |    0.418 |      2.806 |  3.21 ± 0.20 |
-| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                                        | 11.038 ± 0.206 |  10.806 |  11.411 |    1.842 |      7.375 | 10.70 ± 0.71 |
+| Command                                                                             |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       | 0.143 ± 0.006 |   0.136 |   0.156 |    0.052 |      1.865 |         1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          | 0.172 ± 0.006 |   0.164 |   0.185 |    0.243 |      2.207 |  1.20 ± 0.06 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    | 0.184 ± 0.012 |   0.175 |   0.214 |    0.174 |      2.121 |  1.29 ± 0.10 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       | 0.343 ± 0.003 |   0.339 |   0.348 |    0.200 |      1.331 |  2.40 ± 0.10 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` | 0.969 ± 0.015 |   0.939 |   0.994 |    0.288 |      1.432 |  6.78 ± 0.29 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   | 1.122 ± 0.012 |   1.107 |   1.139 |    0.084 |      1.020 |  7.86 ± 0.32 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        | 1.150 ± 0.017 |   1.124 |   1.181 |    0.120 |      1.012 |  8.05 ± 0.34 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 1.213 ± 0.018 |   1.187 |   1.249 |    0.388 |      2.159 |  8.49 ± 0.36 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 2.070 ± 0.032 |   2.022 |   2.123 |    0.680 |      2.409 | 14.49 ± 0.61 |
+
+#### `copy_100_000_files_1G_bytes_0_depth.md`
+
+| Command                                                                             |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    | 0.234 ± 0.003 |   0.230 |   0.237 |    0.126 |      3.047 |        1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          | 0.245 ± 0.002 |   0.241 |   0.248 |    0.136 |      2.969 | 1.05 ± 0.02 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       | 0.312 ± 0.006 |   0.308 |   0.329 |    0.161 |      1.209 | 1.33 ± 0.03 |
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       | 0.846 ± 0.009 |   0.833 |   0.857 |    0.030 |      0.808 | 3.61 ± 0.05 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` | 0.868 ± 0.014 |   0.853 |   0.903 |    0.257 |      1.271 | 3.71 ± 0.07 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   | 0.982 ± 0.007 |   0.972 |   0.992 |    0.072 |      0.893 | 4.20 ± 0.06 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        | 1.014 ± 0.014 |   0.992 |   1.036 |    0.091 |      0.906 | 4.33 ± 0.08 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 1.048 ± 0.014 |   1.029 |   1.074 |    0.333 |      1.906 | 4.48 ± 0.08 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 1.867 ± 0.038 |   1.812 |   1.943 |    0.559 |      2.137 | 7.98 ± 0.18 |
+
+#### `copy_100_000_files_1G_bytes_0_depth_0_entropy.md`
+
+| Command                                                                             |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |    Relative |
+|:------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|------------:|
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    | 0.233 ± 0.003 |   0.230 |   0.237 |    0.127 |      3.037 |        1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          | 0.248 ± 0.003 |   0.244 |   0.251 |    0.147 |      2.993 | 1.06 ± 0.02 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       | 0.308 ± 0.003 |   0.305 |   0.315 |    0.175 |      1.180 | 1.32 ± 0.02 |
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       | 0.852 ± 0.006 |   0.842 |   0.860 |    0.028 |      0.814 | 3.65 ± 0.05 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` | 0.863 ± 0.011 |   0.844 |   0.880 |    0.237 |      1.284 | 3.70 ± 0.07 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   | 0.986 ± 0.008 |   0.973 |   0.995 |    0.084 |      0.886 | 4.23 ± 0.06 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        | 1.001 ± 0.012 |   0.976 |   1.016 |    0.101 |      0.882 | 4.29 ± 0.07 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 1.047 ± 0.019 |   1.009 |   1.077 |    0.338 |      1.908 | 4.49 ± 0.10 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 1.876 ± 0.037 |   1.847 |   1.971 |    0.589 |      2.128 | 8.04 ± 0.19 |
+
+#### `copy_100_000_files_1G_bytes_5_files_per_dir.md`
+
+| Command                                                                             |      Mean [s] | Min [s] | Max [s] | User [s] | System [s] |     Relative |
+|:------------------------------------------------------------------------------------|--------------:|--------:|--------:|---------:|-----------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       | 0.145 ± 0.007 |   0.132 |   0.156 |    0.083 |      2.025 |         1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          | 0.164 ± 0.005 |   0.158 |   0.172 |    0.281 |      2.147 |  1.13 ± 0.06 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    | 0.178 ± 0.010 |   0.166 |   0.195 |    0.234 |      2.085 |  1.22 ± 0.09 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       | 0.349 ± 0.006 |   0.342 |   0.357 |    0.295 |      1.380 |  2.40 ± 0.12 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` | 0.972 ± 0.010 |   0.960 |   0.993 |    0.345 |      1.420 |  6.68 ± 0.31 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   | 1.183 ± 0.010 |   1.169 |   1.196 |    0.103 |      1.060 |  8.14 ± 0.37 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        | 1.318 ± 0.018 |   1.295 |   1.344 |    0.126 |      1.167 |  9.06 ± 0.43 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 1.369 ± 0.019 |   1.335 |   1.402 |    0.640 |      2.194 |  9.41 ± 0.45 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 1.952 ± 0.022 |   1.924 |   1.987 |    0.929 |      2.517 | 13.42 ± 0.63 |
+
+#### `copy_10_000_files_0_bytes.md`
+
+| Command                                                                             |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:------------------------------------------------------------------------------------|-------------:|---------:|---------:|----------:|------------:|-------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |    7.9 ± 0.6 |      7.2 |      9.8 |       5.0 |        81.6 |         1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |   12.1 ± 0.7 |     11.0 |     15.5 |      23.5 |       125.3 |  1.54 ± 0.14 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |   29.1 ± 2.1 |     27.3 |     42.1 |      52.1 |        82.1 |  3.71 ± 0.37 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  39.1 ± 10.3 |     23.8 |     71.9 |      16.9 |       114.1 |  4.97 ± 1.36 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |   40.4 ± 0.9 |     39.6 |     44.0 |      23.0 |        43.7 |  5.15 ± 0.38 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |   62.5 ± 0.9 |     61.0 |     64.1 |       8.2 |        53.6 |  7.95 ± 0.58 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |   72.8 ± 0.9 |     71.0 |     74.6 |       9.4 |        62.5 |  9.26 ± 0.67 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 156.8 ± 14.2 |    140.8 |    186.8 |     145.2 |        54.2 | 19.95 ± 2.30 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         |  202.5 ± 2.6 |    196.8 |    205.7 |      32.8 |       131.7 | 25.77 ± 1.87 |
+
+#### `copy_10_000_files_1G_bytes.md`
+
+| Command                                                                             |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:------------------------------------------------------------------------------------|-------------:|---------:|---------:|----------:|------------:|------------:|
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |   84.2 ± 5.0 |     77.5 |     95.1 |      14.3 |      1116.4 |        1.00 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |   85.0 ± 4.6 |     78.2 |     96.6 |      52.7 |      1159.0 | 1.01 ± 0.08 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  112.0 ± 9.7 |     99.8 |    133.0 |      35.9 |      1114.1 | 1.33 ± 0.14 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |  119.1 ± 3.9 |    112.9 |    125.1 |      27.0 |       469.7 | 1.41 ± 0.09 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 347.5 ± 11.5 |    333.9 |    363.9 |     148.0 |       663.0 | 4.13 ± 0.28 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  375.6 ± 4.5 |    368.3 |    382.2 |      14.3 |       359.0 | 4.46 ± 0.27 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  393.6 ± 3.9 |    387.4 |    399.4 |      23.5 |       367.7 | 4.67 ± 0.28 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  431.1 ± 4.2 |    424.2 |    440.6 |      63.6 |       713.3 | 5.12 ± 0.30 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 746.5 ± 14.7 |    724.6 |    768.7 |     339.8 |       836.0 | 8.86 ± 0.55 |
+
+#### `copy_10_files_0_bytes.md`
+
+| Command                                                                             |  Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |     Relative |
+|:------------------------------------------------------------------------------------|-----------:|---------:|---------:|----------:|------------:|-------------:|
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  0.8 ± 0.0 |      0.7 |      1.3 |       0.6 |         0.1 |         1.00 |
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |  1.0 ± 0.1 |      0.9 |      1.5 |       1.3 |         0.3 |  1.28 ± 0.13 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  1.4 ± 0.1 |      1.0 |      2.0 |       1.0 |         0.4 |  1.79 ± 0.14 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |  1.5 ± 0.2 |      1.2 |      3.3 |       3.8 |         1.4 |  1.84 ± 0.23 |
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |  1.8 ± 0.1 |      1.6 |      4.3 |       3.1 |         1.8 |  2.28 ± 0.23 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |  1.8 ± 0.1 |      1.6 |      2.4 |       1.5 |         0.8 |  2.29 ± 0.20 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  2.5 ± 0.1 |      2.3 |      4.2 |       3.0 |         0.7 |  3.18 ± 0.26 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 13.2 ± 0.3 |     12.6 |     14.4 |      14.0 |        11.0 | 16.77 ± 1.10 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 48.6 ± 3.1 |     44.7 |     55.9 |       5.7 |         6.3 | 61.72 ± 5.43 |
+
+#### `copy_10_files_1G_bytes.md`
+
+| Command                                                                             |    Mean [ms] | Min [ms] | Max [ms] | User [ms] | System [ms] |    Relative |
+|:------------------------------------------------------------------------------------|-------------:|---------:|---------:|----------:|------------:|------------:|
+| `fcp /tmp/ftzz /tmp/ftzzz`                                                          |   66.1 ± 4.8 |     57.9 |     78.3 |       2.1 |       299.6 |        1.00 |
+| `./target/release/cp_rayon /tmp/ftzz /tmp/ftzzz`                                    |   66.8 ± 4.7 |     59.0 |     79.0 |       3.3 |       303.7 | 1.01 ± 0.10 |
+| `xcp -r /tmp/ftzz /tmp/ftzzz`                                                       |   73.4 ± 4.8 |     68.8 |     87.2 |       0.7 |       228.7 | 1.11 ± 0.11 |
+| *`./target/release/cpz /tmp/ftzz /tmp/ftzzz`*                                       |   99.7 ± 2.4 |     95.5 |    104.7 |       1.1 |       204.6 | 1.51 ± 0.12 |
+| `./target/release/cp_stdlib /tmp/ftzz /tmp/ftzzz`                                   |  188.2 ± 2.5 |    182.8 |    193.1 |       0.0 |       188.0 | 2.85 ± 0.21 |
+| `cp -r /tmp/ftzz /tmp/ftzzz`                                                        |  189.8 ± 1.8 |    187.3 |    192.4 |       1.7 |       188.0 | 2.87 ± 0.21 |
+| `sh -c '(cd /tmp/ftzz; tar cf - .) \| (mkdir /tmp/ftzzz; cd /tmp/ftzzz; tar xf -)'` |  231.4 ± 4.7 |    223.5 |    242.0 |      21.5 |       400.4 | 3.50 ± 0.26 |
+| `./wcp/build/wcp /tmp/ftzz /tmp/ftzzz`                                              | 318.2 ± 21.5 |    309.0 |    379.1 |     106.2 |       385.2 | 4.81 ± 0.48 |
+| `rsync -rlp --inplace /tmp/ftzz /tmp/ftzzz`                                         | 417.7 ± 24.5 |    398.3 |    465.2 |     171.8 |       385.0 | 6.32 ± 0.59 |

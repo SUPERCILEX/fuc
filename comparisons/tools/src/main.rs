@@ -22,8 +22,10 @@ fn main() {
                 .unwrap()
         }
 
-        let a = a.file_name().to_string_lossy().into_owned();
-        let b = b.file_name().to_string_lossy().into_owned();
+        let a = a.file_name();
+        let b = b.file_name();
+        let a = a.to_string_lossy();
+        let b = b.to_string_lossy();
 
         index(&a).cmp(&index(&b)).then(a.cmp(&b))
     });
