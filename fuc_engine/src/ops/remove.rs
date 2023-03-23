@@ -161,8 +161,8 @@ mod compat {
             {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 for message in &tasks {
-                    let maybe_spawn = || {
-                        if available_parallelism > 0 {
+                    let mut maybe_spawn = || {
+                        if available_parallelism > 0 && !tasks.is_empty() {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
@@ -170,6 +170,7 @@ mod compat {
                             }));
                         }
                     };
+                    maybe_spawn();
 
                     match message {
                         Message::Node(node) => delete_dir(node, &mut buf, maybe_spawn)?,
@@ -228,6 +229,7 @@ mod compat {
                 t => t,
             };
             if file_type == FileType::Directory {
+                maybe_spawn();
                 node.messages
                     .send(Message::Node(TreeNode {
                         path: concat_cstrs(&node.path, file.file_name()),
@@ -235,7 +237,6 @@ mod compat {
                         messages: node.messages.clone(),
                     }))
                     .map_err(|_| Error::Internal)?;
-                maybe_spawn();
             } else {
                 unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
                     format!(

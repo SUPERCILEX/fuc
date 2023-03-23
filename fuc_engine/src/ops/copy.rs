@@ -177,8 +177,8 @@ mod compat {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
-                    let maybe_spawn = || {
-                        if available_parallelism > 0 {
+                    let mut maybe_spawn = || {
+                        if available_parallelism > 0 && !tasks.is_empty() {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
@@ -186,6 +186,7 @@ mod compat {
                             }));
                         }
                     };
+                    maybe_spawn();
 
                     copy_dir(&node, &mut buf, &symlink_buf_cache, maybe_spawn)?;
                 }
@@ -249,6 +250,7 @@ mod compat {
                 t => t,
             };
             if file_type == FileType::Directory {
+                maybe_spawn();
                 messages
                     .send(TreeNode {
                         from: concat_cstrs(from, file.file_name()),
@@ -257,7 +259,6 @@ mod compat {
                         root_to_inode: Some(root_to_inode),
                     })
                     .map_err(|_| Error::Internal)?;
-                maybe_spawn();
             } else {
                 copy_one_file(
                     &from_dir,
