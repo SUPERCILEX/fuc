@@ -329,7 +329,7 @@ version = "0.0.0"
 
 [[package]]
 name = "cpz"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "cache-size",
  "clap2",
@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "fuc_engine"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "crossbeam-channel",
  "ftzz",
@@ -1225,7 +1225,7 @@ version = "0.0.0"
 
 [[package]]
 name = "rmz"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "clap2",
  "criterion",
