@@ -177,15 +177,17 @@ mod compat {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
-                    if available_parallelism > 0 && !tasks.is_empty() {
-                        available_parallelism -= 1;
-                        threads.push(scope.spawn({
-                            let tasks = tasks.clone();
-                            || worker_thread(tasks)
-                        }));
-                    }
+                    let maybe_spawn = || {
+                        if available_parallelism > 0 {
+                            available_parallelism -= 1;
+                            threads.push(scope.spawn({
+                                let tasks = tasks.clone();
+                                || worker_thread(tasks)
+                            }));
+                        }
+                    };
 
-                    copy_dir(&node, &mut buf, &symlink_buf_cache)?;
+                    copy_dir(&node, &mut buf, &symlink_buf_cache, maybe_spawn)?;
                 }
             }
 
@@ -202,7 +204,7 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(&node, &mut buf, &symlink_buf_cache)?;
+            copy_dir(&node, &mut buf, &symlink_buf_cache, || {})?;
         }
         Ok(())
     }
@@ -216,6 +218,7 @@ mod compat {
         }: &TreeNode,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
+        mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
         let from_dir = openat(
             cwd(),
@@ -254,6 +257,7 @@ mod compat {
                         root_to_inode: Some(root_to_inode),
                     })
                     .map_err(|_| Error::Internal)?;
+                maybe_spawn();
             } else {
                 copy_one_file(
                     &from_dir,

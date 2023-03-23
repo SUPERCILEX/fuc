@@ -161,16 +161,18 @@ mod compat {
             {
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 for message in &tasks {
-                    if available_parallelism > 0 && !tasks.is_empty() {
-                        available_parallelism -= 1;
-                        threads.push(scope.spawn({
-                            let tasks = tasks.clone();
-                            || worker_thread(tasks)
-                        }));
-                    }
+                    let maybe_spawn = || {
+                        if available_parallelism > 0 {
+                            available_parallelism -= 1;
+                            threads.push(scope.spawn({
+                                let tasks = tasks.clone();
+                                || worker_thread(tasks)
+                            }));
+                        }
+                    };
 
                     match message {
-                        Message::Node(node) => delete_dir(node, &mut buf)?,
+                        Message::Node(node) => delete_dir(node, &mut buf, maybe_spawn)?,
                         Message::Error(e) => return Err(e),
                     }
                 }
@@ -189,14 +191,18 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
             match message {
-                Message::Node(node) => delete_dir(node, &mut buf)?,
+                Message::Node(node) => delete_dir(node, &mut buf, || {})?,
                 Message::Error(e) => return Err(e),
             }
         }
         Ok(())
     }
 
-    fn delete_dir(node: TreeNode, buf: &mut [MaybeUninit<u8>]) -> Result<(), Error> {
+    fn delete_dir(
+        node: TreeNode,
+        buf: &mut [MaybeUninit<u8>],
+        mut maybe_spawn: impl FnMut(),
+    ) -> Result<(), Error> {
         let dir = openat(
             cwd(),
             node.path.as_c_str(),
@@ -229,6 +235,7 @@ mod compat {
                         messages: node.messages.clone(),
                     }))
                     .map_err(|_| Error::Internal)?;
+                maybe_spawn();
             } else {
                 unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
                     format!(
