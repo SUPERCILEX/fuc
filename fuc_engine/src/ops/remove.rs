@@ -94,7 +94,10 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
-    use rustix::fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir};
+    use rustix::{
+        fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
+        thread::{unshare, UnshareFlags},
+    };
 
     use crate::{
         ops::{
@@ -181,6 +184,8 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
+        unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.".to_string())?;
+
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
             match message {
