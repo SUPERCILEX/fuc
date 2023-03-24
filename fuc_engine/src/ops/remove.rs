@@ -100,7 +100,11 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
-    use io_uring::{opcode::UnlinkAt, squeue::Flags, types::Fd, IoUring};
+    use io_uring::{
+        opcode::{Statx, UnlinkAt},
+        types::Fd,
+        IoUring,
+    };
     use rustix::{
         fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
         thread::{unshare, UnshareFlags},
@@ -246,6 +250,8 @@ mod compat {
             Ok(())
         }
 
+        let mut statx_bufs = [MaybeUninit::<libc::statx>::uninit(); URING_ENTRIES as usize];
+
         let dir = openat(
             cwd(),
             &node.path,
@@ -285,9 +291,12 @@ mod compat {
                     io_uring
                         .submission()
                         .push(
-                            &UnlinkAt::new(Fd(dir.as_raw_fd()), file.file_name().as_ptr())
-                                .build()
-                                .flags(Flags::IO_LINK),
+                            &Statx::new(
+                                Fd(dir.as_raw_fd()),
+                                file.file_name().as_ptr(),
+                                statx_bufs[pending].as_mut_ptr().cast(),
+                            )
+                            .build(),
                         )
                         .map_err(|_| Error::Internal)?;
                 }
@@ -315,22 +324,22 @@ mod compat {
         messages: Sender<Message>,
     }
 
-    impl Drop for TreeNode {
-        fn drop(&mut self) {
-            let Self {
-                ref path,
-                _parent: _,
-                ref messages,
-            } = *self;
-
-            if let Err(e) = unlinkat(cwd(), path, AtFlags::REMOVEDIR)
-                .map_io_err(|| format!("Failed to delete directory: {path:?}"))
-            {
-                // If the receiver closed, then another error must have already occurred.
-                drop(messages.send(Message::Error(e)));
-            }
-        }
-    }
+    // impl Drop for TreeNode {
+    //     fn drop(&mut self) {
+    //         let Self {
+    //             ref path,
+    //             _parent: _,
+    //             ref messages,
+    //         } = *self;
+    //
+    //         if let Err(e) = unlinkat(cwd(), path, AtFlags::REMOVEDIR)
+    //             .map_io_err(|| format!("Failed to delete directory:
+    // {path:?}"))         {
+    //             // If the receiver closed, then another error must have
+    // already occurred.             drop(messages.send(Message::Error(e)));
+    //         }
+    //     }
+    // }
 }
 
 #[cfg(all(not(target_os = "linux"), not(target_os = "windows")))]
