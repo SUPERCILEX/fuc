@@ -83,14 +83,8 @@ fn schedule_deletions<'a>(
 #[cfg(target_os = "linux")]
 mod compat {
     use std::{
-        borrow::Cow,
-        ffi::{CStr, CString},
-        mem::MaybeUninit,
-        num::NonZeroUsize,
-        path::Path,
-        sync::Arc,
-        thread,
-        thread::JoinHandle,
+        borrow::Cow, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path, sync::Arc,
+        thread, thread::JoinHandle,
     };
 
     use crossbeam_channel::{Receiver, Sender};
@@ -215,13 +209,13 @@ mod compat {
         let node = LazyCell::new(|| Arc::new(node));
         let mut raw_dir = RawDir::new(&dir, buf);
         while let Some(file) = raw_dir.next() {
-            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-            const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
-            const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
-
             let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
-            if file.file_name() == DOT || file.file_name() == DOT_DOT {
-                continue;
+            {
+                // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+                let name = file.file_name().to_bytes();
+                if name == b"." || name == b".." {
+                    continue;
+                }
             }
 
             let file_type = match file.file_type() {

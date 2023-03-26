@@ -233,16 +233,17 @@ mod compat {
 
         let mut raw_dir = RawDir::new(&from_dir, buf);
         while let Some(file) = raw_dir.next() {
-            const DOT: &CStr = CStr::from_bytes_with_nul(b".\0").ok().unwrap();
-            const DOT_DOT: &CStr = CStr::from_bytes_with_nul(b"..\0").ok().unwrap();
-
             let file = file.map_io_err(|| format!("Failed to read directory: {from:?}"))?;
-            if file.file_name() == DOT || file.file_name() == DOT_DOT {
-                continue;
-            }
             if file.ino() == root_to_inode {
                 // Block recursive descent from parent into child (e.g. cp parent parent/child).
                 continue;
+            }
+            {
+                // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+                let name = file.file_name().to_bytes();
+                if name == b"." || name == b".." {
+                    continue;
+                }
             }
 
             let file_type = match file.file_type() {
@@ -277,7 +278,8 @@ mod compat {
         from_dir: impl AsFd,
         TreeNode { from, to, .. }: &TreeNode,
     ) -> Result<OwnedFd, Error> {
-        const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
+        // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+        const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 
         let from_mode = {
             let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
@@ -451,7 +453,8 @@ mod compat {
         Ok(if let Some(ino) = *root_to_inode {
             ino
         } else {
-            const EMPTY: &CStr = CStr::from_bytes_with_nul(b"\0").ok().unwrap();
+            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+            const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 
             let to_metadata = statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO)
                 .map_io_err(|| format!("Failed to stat directory: {to:?}"))?;

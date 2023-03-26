@@ -1,6 +1,3 @@
-#![feature(const_cstr_methods)]
-#![feature(const_result_drop)]
-#![feature(const_option)]
 #![feature(once_cell)]
 #![allow(clippy::module_name_repetitions)]
 
