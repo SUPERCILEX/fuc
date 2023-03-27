@@ -111,11 +111,12 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 #[cfg(target_os = "linux")]
 mod compat {
     use std::{
-        borrow::Cow, cell::LazyCell, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path,
-        sync::Arc, thread, thread::JoinHandle,
+        borrow::Cow, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path, sync::Arc,
+        thread, thread::JoinHandle,
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use once_cell::sync::Lazy as LazyCell;
     use rustix::{
         fs::{openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir, CWD},
         thread::{unshare, UnshareFlags},
@@ -162,7 +163,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
+            if let Ok((tasks, thread)) = LazyCell::into_value(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
@@ -238,8 +239,8 @@ mod compat {
         while let Some(file) = raw_dir.next() {
             let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
             {
-                let name = file.file_name();
-                if name == c"." || name == c".." {
+                let name = file.file_name().to_bytes();
+                if name == b"." || name == b".." {
                     continue;
                 }
             }

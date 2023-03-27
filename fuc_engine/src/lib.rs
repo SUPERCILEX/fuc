@@ -1,5 +1,3 @@
-#![feature(lazy_cell)]
-#![feature(lazy_cell_consume)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::needless_pass_by_value)]
 
