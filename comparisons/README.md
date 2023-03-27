@@ -20,6 +20,9 @@ mkdir benches /tmp/empty
 - Memory: 15GiB
 - `/dev/sda6 /tmp xfs rw,nosuid,nodev,relatime,attr2,inode64,logbufs=8,logbsize=32k,noquota 0 0`
 
+> The macOS/Windows implementations are currently equivalent to the `*_rayon` implementations shown
+> in the benchmarks.
+
 ## Remove
 
 ### Run
