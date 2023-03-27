@@ -14,7 +14,7 @@ Binaries for a number of platforms are available on the
 ### Build from source
 
 ```console,ignore
-$ cargo +nightly install cpz
+$ cargo install cpz
 ```
 
 > To install cargo, follow
