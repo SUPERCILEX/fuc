@@ -28,9 +28,9 @@ mod linux {
     use std::{
         ffi::{CStr, CString, OsStr, OsString},
         io,
-        os::{
-            fd::AsFd,
-            unix::ffi::{OsStrExt, OsStringExt},
+        os::unix::{
+            ffi::{OsStrExt, OsStringExt},
+            io::AsFd,
         },
         path::{Path, PathBuf, MAIN_SEPARATOR},
     };

@@ -101,7 +101,7 @@ mod compat {
         io,
         mem::MaybeUninit,
         num::NonZeroUsize,
-        os::fd::{AsFd, OwnedFd},
+        os::unix::io::{AsFd, OwnedFd},
         path::Path,
         thread,
         thread::JoinHandle,
