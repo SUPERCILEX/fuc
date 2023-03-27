@@ -95,7 +95,7 @@ mod compat {
 // TODO remove: https://github.com/rust-lang/rust/issues/74465#issuecomment-1364969188
 #[cfg(target_os = "linux")]
 struct LazyCell<T, F = fn() -> T> {
-    cell: std::cell::OnceCell<T>,
+    cell: once_cell::sync::OnceCell<T>,
     init: std::cell::Cell<Option<F>>,
 }
 
@@ -103,7 +103,7 @@ struct LazyCell<T, F = fn() -> T> {
 impl<T, F> LazyCell<T, F> {
     pub const fn new(init: F) -> Self {
         Self {
-            cell: std::cell::OnceCell::new(),
+            cell: once_cell::sync::OnceCell::new(),
             init: std::cell::Cell::new(Some(init)),
         }
     }

@@ -1,4 +1,3 @@
-#![feature(once_cell)]
 #![allow(clippy::module_name_repetitions)]
 
 use std::{io, path::PathBuf};
