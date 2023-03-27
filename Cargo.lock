@@ -355,6 +355,7 @@ dependencies = [
  "error-stack",
  "fuc_engine",
  "memmap2",
+ "once_cell",
  "rand",
  "rustix",
  "supercilex-tests",
@@ -581,6 +582,7 @@ version = "1.1.6"
 dependencies = [
  "crossbeam-channel",
  "ftzz",
+ "once_cell",
  "rayon",
  "remove_dir_all",
  "rstest",

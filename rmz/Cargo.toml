@@ -8,6 +8,7 @@ repository.workspace = true
 keywords = ["tools", "files", "rm"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 clap = { version = "4.4.4", features = ["derive", "wrap_help"] }
