@@ -18,6 +18,7 @@ authors = ["Alex Saveau <saveau.alexandre@gmail.com>"]
 edition = "2021"
 repository = "https://github.com/SUPERCILEX/fuc"
 license = "Apache-2.0"
+rust-version = "1.70"
 
 [package]
 name = "lint"

@@ -112,7 +112,6 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 mod compat {
     use std::{
         borrow::Cow,
-        cell::LazyCell,
         env::{current_dir, set_current_dir},
         ffi::{CStr, CString, OsStr},
         fs,
@@ -126,6 +125,7 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use once_cell::sync::Lazy as LazyCell;
     use rustix::{
         fs::{openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir, CWD},
         thread::{unshare, UnshareFlags},
@@ -172,7 +172,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
+            if let Ok((tasks, thread)) = LazyCell::into_value(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
@@ -291,8 +291,8 @@ mod compat {
             let file =
                 file.map_io_err(|| format!("Failed to read directory: {:?}", node.as_ref().path))?;
             {
-                let name = file.file_name();
-                if name == c"." || name == c".." {
+                let name = file.file_name().to_bytes();
+                if name == b"." || name == b".." {
                     continue;
                 }
             }
@@ -302,7 +302,7 @@ mod compat {
                 t => t,
             };
             if file_type == FileType::Directory {
-                if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes()
+                if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().to_bytes().len()
                     > 4096
                 {
                     long_path_fallback_deletion(&node.as_ref().path, file.file_name())?;

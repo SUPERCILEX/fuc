@@ -1,8 +1,4 @@
-#![feature(lazy_cell)]
-#![feature(let_chains)]
-
 use std::{
-    cell::LazyCell,
     fs,
     mem::swap,
     path::{PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
@@ -11,6 +7,7 @@ use std::{
 use clap::{ArgAction, Parser, ValueHint};
 use error_stack::Report;
 use fuc_engine::{CopyOp, Error};
+use once_cell::sync::Lazy as LazyCell;
 
 /// A zippy alternative to `cp`, a tool to copy files and directories
 #[derive(Parser, Debug)]
@@ -142,8 +139,10 @@ fn copy(
                 let to = {
                     let is_into_directory = *is_into_directory;
                     let mut to = to;
-                    if is_into_directory && let Some(name) = from.file_name() {
-                        to.push(name);
+                    if is_into_directory {
+                        if let Some(name) = from.file_name() {
+                            to.push(name);
+                        }
                     }
                     to
                 };
