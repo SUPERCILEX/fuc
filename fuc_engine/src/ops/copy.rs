@@ -141,7 +141,7 @@ fn schedule_copies<
 mod compat {
     use std::{
         borrow::Cow,
-        cell::{Cell, LazyCell},
+        cell::Cell,
         ffi::{CStr, CString},
         fmt::{Debug, Formatter},
         fs::File,
@@ -155,6 +155,7 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use once_cell::sync::Lazy as LazyCell;
     use rustix::{
         fs::{
             copy_file_range, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
@@ -171,6 +172,8 @@ mod compat {
         },
         Error,
     };
+
+    const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
         #[allow(clippy::type_complexity)]
@@ -205,7 +208,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
+            if let Ok((tasks, thread)) = LazyCell::into_value(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
@@ -238,8 +241,10 @@ mod compat {
                             Mode::empty(),
                         )
                         .map_io_err(|| format!("Failed to open directory: {:?}", node.to))?;
-                        let to_metadata = statx(to_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::INO)
-                            .map_io_err(|| format!("Failed to stat directory: {:?}", node.to))?;
+                        let to_metadata =
+                            statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO).map_io_err(
+                                || format!("Failed to stat directory: {:?}", node.to),
+                            )?;
                         root_to_inode = Some(to_metadata.stx_ino);
                         to_metadata.stx_ino
                     };
@@ -325,8 +330,8 @@ mod compat {
                 continue;
             }
             {
-                let name = file.file_name();
-                if name == c"." || name == c".." {
+                let name = file.file_name().to_bytes();
+                if name == b"." || name == b".." {
                     continue;
                 }
             }
@@ -373,7 +378,7 @@ mod compat {
         to_path: &CString,
     ) -> Result<(), Error> {
         let from_mode = {
-            let from_metadata = statx(from_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::MODE)
+            let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
                 .map_io_err(|| format!("Failed to stat directory: {from_path:?}"))?;
             Mode::from_raw_mode(from_metadata.stx_mode.into())
         };
