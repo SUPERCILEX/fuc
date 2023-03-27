@@ -8,9 +8,11 @@ repository.workspace = true
 keywords = ["tools", "files"]
 categories = ["filesystem"]
 license.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 crossbeam-channel = "0.5.13"
+once_cell = "1.18.0"
 thiserror = "1.0.61"
 tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
 typed-builder = "0.18.2"
