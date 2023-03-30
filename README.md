@@ -1,13 +1,15 @@
 # Fast Unix Commands
 
-The FUC-ing project provides modern unix commands focused on performance.
+[![cpz crates.io](https://img.shields.io/crates/v/cpz?label=cpz%20crates.io&style=flat-square)](https://crates.io/crates/cpz)
+[![rmz crates.io](https://img.shields.io/crates/v/rmz?label=rmz%20crates.io&style=flat-square)](https://crates.io/crates/rmz)
+[![Packaging status](https://repology.org/badge/tiny-repos/fuc.svg)](https://repology.org/project/fuc/badges)
 
-Benchmarks are available under the [`comparisons`](comparisons/) folder.
+The FUC-ing project provides modern unix commands focused on performance:
 
-## Commands
-
-- [`rmz`](rmz)
 - [`cpz`](cpz)
+- [`rmz`](rmz)
+
+Benchmarks are available under the [`comparisons`](comparisons) folder.
 
 ## Goals
 
