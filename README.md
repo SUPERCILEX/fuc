@@ -6,8 +6,8 @@
 
 The FUC-ing project provides modern unix commands focused on performance:
 
-- [`cpz`](#cpz)
-- [`rmz`](#rmz)
+- [`cpz`](cpz)
+- [`rmz`](rmz)
 
 Benchmarks are available under the [`comparisons`](comparisons) folder.
 
