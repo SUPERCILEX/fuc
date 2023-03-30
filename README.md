@@ -25,24 +25,3 @@ Benchmarks are available under the [`comparisons`](comparisons) folder.
 - Compatibility: [coreutils](https://github.com/coreutils/coreutils) or
   its [Rust re-implementation](https://github.com/uutils/coreutils) will have the broadest and most
   stable set of options.
-  
-## Installing with cargo
-
-    cargo install cpz
-    cargo install rmz
-
-## Building from source
-
-As of v1.1.7 ths project builds with rust stable >= 1.68.
-
-    git clone [...]
-    cargo build --all
-
-Running tests still requires rust nightly:
-
-    cargo test
-
-To install the loccally built binaries:
-
-    cargo install --path cpz
-    cargo install --path mpv
