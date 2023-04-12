@@ -18,12 +18,12 @@ thiserror = "1.0.40"
 [dev-dependencies]
 criterion = "0.4.0"
 ftzz = "2.0.0"
-tempfile = "3.4.0"
+tempfile = "3.5.0"
 trycmd = "0.14.15"
 rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
-supercilex-tests = "0.3.1"
-remove_dir_all = "0.8.1"
+supercilex-tests = "0.3.2"
+remove_dir_all = "0.8.2"
 
 [[bench]]
 name = "rmz"

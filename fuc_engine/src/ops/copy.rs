@@ -141,7 +141,7 @@ mod compat {
     use rustix::{
         fs::{
             copy_file_range, cwd, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
-            Mode, OFlags, RawDir, RawMode, StatxFlags,
+            Mode, OFlags, RawDir, StatxFlags,
         },
         io::Errno,
         thread::{unshare, UnshareFlags},
@@ -308,18 +308,20 @@ mod compat {
         from_dir: impl AsFd,
         TreeNode { from, to, .. }: &TreeNode,
     ) -> Result<OwnedFd, Error> {
-        // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-        const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
+        {
+            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+            const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 
-        let from_mode = {
-            let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
-                .map_io_err(|| format!("Failed to stat directory: {from:?}"))?;
-            Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
-        };
-        match mkdirat(cwd(), to.as_c_str(), from_mode) {
-            Err(Errno::EXIST) => {}
-            r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
-        };
+            let from_mode = {
+                let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
+                    .map_io_err(|| format!("Failed to stat directory: {from:?}"))?;
+                Mode::from_raw_mode(from_metadata.stx_mode.into())
+            };
+            match mkdirat(cwd(), to.as_c_str(), from_mode) {
+                Err(Errno::EXIST) => {}
+                r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
+            };
+        }
 
         openat(
             cwd(),
@@ -416,29 +418,31 @@ mod compat {
                     join_cstr_paths(from_path, file_name)
                 )
             })?;
-        let from_mode = {
-            let from_metadata = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
-                .map_io_err(|| {
-                    format!(
-                        "Failed to stat file: {:?}",
-                        join_cstr_paths(from_path, file_name)
-                    )
-                })?;
-            Mode::from_raw_mode(RawMode::from(from_metadata.stx_mode))
-        };
 
-        let to = openat(
-            &to_dir,
-            file_name,
-            OFlags::CREATE | OFlags::TRUNC | OFlags::WRONLY,
-            from_mode,
-        )
-        .map_io_err(|| {
-            format!(
-                "Failed to open file: {:?}",
-                join_cstr_paths(to_path, file_name)
+        let to = {
+            let from_mode = {
+                let from_metadata = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
+                    .map_io_err(|| {
+                        format!(
+                            "Failed to stat file: {:?}",
+                            join_cstr_paths(from_path, file_name)
+                        )
+                    })?;
+                Mode::from_raw_mode(from_metadata.stx_mode.into())
+            };
+            openat(
+                &to_dir,
+                file_name,
+                OFlags::CREATE | OFlags::TRUNC | OFlags::WRONLY,
+                from_mode,
             )
-        })?;
+            .map_io_err(|| {
+                format!(
+                    "Failed to open file: {:?}",
+                    join_cstr_paths(to_path, file_name)
+                )
+            })?
+        };
 
         Ok((from, to))
     }

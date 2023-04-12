@@ -35,7 +35,7 @@ mod linux {
         path::{Path, PathBuf, MAIN_SEPARATOR},
     };
 
-    use rustix::fs::{statx, AtFlags, FileType, RawMode, StatxFlags};
+    use rustix::fs::{statx, AtFlags, FileType, StatxFlags};
 
     use crate::{ops::IoErr, Error};
 
@@ -78,7 +78,7 @@ mod linux {
                     join_cstr_paths(path, file_name)
                 )
             })
-            .map(|metadata| FileType::from_raw_mode(RawMode::from(metadata.stx_mode)))
+            .map(|metadata| FileType::from_raw_mode(metadata.stx_mode.into()))
     }
 }
 
