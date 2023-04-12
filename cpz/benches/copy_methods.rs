@@ -1,6 +1,3 @@
-// TODO
-#![allow(clippy::significant_drop_tightening)]
-
 use std::{
     alloc,
     alloc::Layout,

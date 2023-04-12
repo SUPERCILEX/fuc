@@ -146,7 +146,6 @@ mod compat {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     fn root_worker_thread(tasks: Receiver<Message>) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
@@ -204,7 +203,7 @@ mod compat {
     ) -> Result<(), Error> {
         let dir = openat(
             cwd(),
-            node.path.as_c_str(),
+            &node.path,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
         )
@@ -267,7 +266,7 @@ mod compat {
                 ref messages,
             } = *self;
 
-            if let Err(e) = unlinkat(cwd(), path.as_c_str(), AtFlags::REMOVEDIR)
+            if let Err(e) = unlinkat(cwd(), path, AtFlags::REMOVEDIR)
                 .map_io_err(|| format!("Failed to delete directory: {path:?}"))
             {
                 // If the receiver closed, then another error must have already occurred.

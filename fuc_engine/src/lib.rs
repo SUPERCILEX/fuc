@@ -1,5 +1,6 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::used_underscore_binding)]
+#![allow(clippy::needless_pass_by_value)]
 
 use std::{io, path::PathBuf};
 

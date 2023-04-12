@@ -101,6 +101,18 @@ fn schedule_copies<
 
         #[cfg(unix)]
         if from_metadata.is_dir() {
+            use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+            match fs::DirBuilder::new()
+                .mode(
+                    fs::symlink_metadata(&from)
+                        .map_io_err(|| format!("Failed to stat directory: {from:?}"))?
+                        .mode(),
+                )
+                .create(&to)
+            {
+                Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {}
+                r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
+            };
             copy.run((from, to))?;
         } else if from_metadata.is_symlink() {
             let link =
@@ -193,7 +205,6 @@ mod compat {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
@@ -218,7 +229,7 @@ mod compat {
                     };
                     maybe_spawn();
 
-                    copy_dir(&node, &mut buf, &symlink_buf_cache, maybe_spawn)?;
+                    copy_dir(node, &mut buf, &symlink_buf_cache, maybe_spawn)?;
                 }
             }
 
@@ -235,31 +246,37 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(&node, &mut buf, &symlink_buf_cache, || {})?;
+            copy_dir(node, &mut buf, &symlink_buf_cache, || {})?;
         }
         Ok(())
     }
 
     fn copy_dir(
-        node @ TreeNode {
+        TreeNode {
             from,
             to,
             messages,
-            root_to_inode: _,
-        }: &TreeNode,
+            root_to_inode,
+        }: TreeNode,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
         mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
         let from_dir = openat(
             cwd(),
-            from.as_c_str(),
+            &from,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {from:?}"))?;
-        let to_dir = copy_one_dir(&from_dir, node)?;
-        let root_to_inode = maybe_compute_root_to_inode(&to_dir, node)?;
+        let to_dir = openat(
+            cwd(),
+            &to,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
+            Mode::empty(),
+        )
+        .map_io_err(|| format!("Failed to open directory: {to:?}"))?;
+        let root_to_inode = maybe_compute_root_to_inode(&to_dir, &to, root_to_inode)?;
 
         let mut raw_dir = RawDir::new(&from_dir, buf);
         while let Some(file) = raw_dir.next() {
@@ -277,15 +294,19 @@ mod compat {
             }
 
             let file_type = match file.file_type() {
-                FileType::Unknown => get_file_type(&from_dir, file.file_name(), from)?,
+                FileType::Unknown => get_file_type(&from_dir, file.file_name(), &from)?,
                 t => t,
             };
             if file_type == FileType::Directory {
+                let from = concat_cstrs(&from, file.file_name());
+                let to = concat_cstrs(&to, file.file_name());
+
+                copy_one_dir(&from_dir, &from, &to)?;
                 maybe_spawn();
                 messages
                     .send(TreeNode {
-                        from: concat_cstrs(from, file.file_name()),
-                        to: concat_cstrs(to, file.file_name()),
+                        from,
+                        to,
                         messages: messages.clone(),
                         root_to_inode: Some(root_to_inode),
                     })
@@ -296,7 +317,8 @@ mod compat {
                     &to_dir,
                     file.file_name(),
                     file_type,
-                    node,
+                    &from,
+                    &to,
                     symlink_buf_cache,
                 )?;
             }
@@ -304,32 +326,25 @@ mod compat {
         Ok(())
     }
 
-    fn copy_one_dir(
+    pub fn copy_one_dir(
         from_dir: impl AsFd,
-        TreeNode { from, to, .. }: &TreeNode,
-    ) -> Result<OwnedFd, Error> {
-        {
-            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-            const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
+        from_path: &CString,
+        to_path: &CString,
+    ) -> Result<(), Error> {
+        // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
+        const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
 
-            let from_mode = {
-                let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
-                    .map_io_err(|| format!("Failed to stat directory: {from:?}"))?;
-                Mode::from_raw_mode(from_metadata.stx_mode.into())
-            };
-            match mkdirat(cwd(), to.as_c_str(), from_mode) {
-                Err(Errno::EXIST) => {}
-                r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
-            };
-        }
+        let from_mode = {
+            let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
+                .map_io_err(|| format!("Failed to stat directory: {from_path:?}"))?;
+            Mode::from_raw_mode(from_metadata.stx_mode.into())
+        };
+        match mkdirat(cwd(), to_path, from_mode) {
+            Err(Errno::EXIST) => {}
+            r => r.map_io_err(|| format!("Failed to create directory: {to_path:?}"))?,
+        };
 
-        openat(
-            cwd(),
-            to.as_c_str(),
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
-            Mode::empty(),
-        )
-        .map_io_err(|| format!("Failed to open directory: {to:?}"))
+        Ok(())
     }
 
     fn copy_one_file(
@@ -337,17 +352,25 @@ mod compat {
         to_dir: impl AsFd,
         file_name: &CStr,
         file_type: FileType,
-        node: &TreeNode,
+        from_path: &CString,
+        to_path: &CString,
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
         if file_type == FileType::Symlink {
-            copy_symlink(from_dir, to_dir, file_name, node, symlink_buf_cache)
+            copy_symlink(
+                from_dir,
+                to_dir,
+                file_name,
+                from_path,
+                to_path,
+                symlink_buf_cache,
+            )
         } else {
-            let (from, to) = prep_regular_file(from_dir, to_dir, file_name, node)?;
+            let (from, to) = prep_regular_file(from_dir, to_dir, file_name, from_path, to_path)?;
             if file_type == FileType::RegularFile {
-                copy_regular_file(from, to, file_name, node)
+                copy_regular_file(from, to, file_name, from_path)
             } else {
-                copy_any_file(from, to, file_name, node)
+                copy_any_file(from, to, file_name, from_path)
             }
         }
     }
@@ -356,16 +379,14 @@ mod compat {
         from: OwnedFd,
         to: OwnedFd,
         file_name: &CStr,
-        node @ TreeNode {
-            from: from_path, ..
-        }: &TreeNode,
+        from_path: &CString,
     ) -> Result<(), Error> {
         let mut total_copied = 0;
         loop {
             let byte_copied =
                 match copy_file_range(&from, None, &to, None, usize::MAX - total_copied) {
                     Err(Errno::XDEV) if total_copied == 0 => {
-                        return copy_any_file(from, to, file_name, node);
+                        return copy_any_file(from, to, file_name, from_path);
                     }
                     r => r.map_io_err(|| {
                         format!(
@@ -387,9 +408,7 @@ mod compat {
         from: OwnedFd,
         to: OwnedFd,
         file_name: &CStr,
-        TreeNode {
-            from: from_path, ..
-        }: &TreeNode,
+        from_path: &CString,
     ) -> Result<(), Error> {
         io::copy(&mut File::from(from), &mut File::from(to))
             .map_io_err(|| {
@@ -405,11 +424,8 @@ mod compat {
         from_dir: impl AsFd,
         to_dir: impl AsFd,
         file_name: &CStr,
-        TreeNode {
-            from: from_path,
-            to: to_path,
-            ..
-        }: &TreeNode,
+        from_path: &CString,
+        to_path: &CString,
     ) -> Result<(OwnedFd, OwnedFd), Error> {
         let from =
             openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty()).map_io_err(|| {
@@ -452,11 +468,8 @@ mod compat {
         from_dir: impl AsFd,
         to_dir: impl AsFd,
         file_name: &CStr,
-        TreeNode {
-            from: from_path,
-            to: to_path,
-            ..
-        }: &TreeNode,
+        from_path: &CString,
+        to_path: &CString,
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
         let from_symlink =
@@ -467,7 +480,7 @@ mod compat {
                 )
             })?;
 
-        symlinkat(from_symlink.as_c_str(), &to_dir, file_name).map_io_err(|| {
+        symlinkat(&from_symlink, &to_dir, file_name).map_io_err(|| {
             format!(
                 "Failed to create symlink: {:?}",
                 join_cstr_paths(to_path, file_name)
@@ -480,11 +493,10 @@ mod compat {
 
     fn maybe_compute_root_to_inode(
         to_dir: impl AsFd,
-        TreeNode {
-            to, root_to_inode, ..
-        }: &TreeNode,
+        to: &CString,
+        root_to_inode: Option<u64>,
     ) -> Result<u64, Error> {
-        Ok(if let Some(ino) = *root_to_inode {
+        Ok(if let Some(ino) = root_to_inode {
             ino
         } else {
             // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
