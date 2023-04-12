@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Debug, fs, io, path::Path};
+use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
 
 use typed_builder::TypedBuilder;
 
@@ -23,15 +23,17 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), Error> {
 }
 
 #[derive(TypedBuilder, Debug)]
-pub struct RemoveOp<'a, F: IntoIterator<Item = Cow<'a, Path>>> {
+pub struct RemoveOp<'a, I: Into<Cow<'a, Path>> + 'a, F: IntoIterator<Item = I>> {
     files: F,
     #[builder(default = false)]
     force: bool,
     #[builder(default = true)]
     preserve_root: bool,
+    #[builder(default)]
+    _marker: PhantomData<&'a I>,
 }
 
-impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
+impl<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>> RemoveOp<'a, I, F> {
     /// Consume and run this remove operation.
     ///
     /// # Errors
@@ -44,15 +46,17 @@ impl<'a, F: IntoIterator<Item = Cow<'a, Path>>> RemoveOp<'a, F> {
     }
 }
 
-fn schedule_deletions<'a>(
+fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
     RemoveOp {
         files,
         force,
         preserve_root,
-    }: RemoveOp<'a, impl IntoIterator<Item = Cow<'a, Path>>>,
+        _marker: _,
+    }: RemoveOp<'a, I, F>,
     remove: &impl DirectoryOp<Cow<'a, Path>>,
 ) -> Result<(), Error> {
     for file in files {
+        let file = file.into();
         if preserve_root && file == Path::new("/") {
             return Err(Error::PreserveRoot);
         }

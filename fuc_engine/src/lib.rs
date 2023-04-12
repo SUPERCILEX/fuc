@@ -1,5 +1,6 @@
 #![feature(once_cell)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::used_underscore_binding)]
 
 use std::{io, path::PathBuf};
 

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Debug, fs, io, path::Path};
+use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
 
 use typed_builder::TypedBuilder;
 
@@ -20,13 +20,30 @@ pub fn copy_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), E
 }
 
 #[derive(TypedBuilder, Debug)]
-pub struct CopyOp<'a, F: IntoIterator<Item = (Cow<'a, Path>, Cow<'a, Path>)>> {
+pub struct CopyOp<
+    'a,
+    'b,
+    I1: Into<Cow<'a, Path>> + 'a,
+    I2: Into<Cow<'b, Path>> + 'b,
+    F: IntoIterator<Item = (I1, I2)>,
+> {
     files: F,
     #[builder(default = false)]
     force: bool,
+    #[builder(default)]
+    _marker1: PhantomData<&'a I1>,
+    #[builder(default)]
+    _marker2: PhantomData<&'b I2>,
 }
 
-impl<'a, F: IntoIterator<Item = (Cow<'a, Path>, Cow<'a, Path>)>> CopyOp<'a, F> {
+impl<
+    'a,
+    'b,
+    I1: Into<Cow<'a, Path>> + 'a,
+    I2: Into<Cow<'b, Path>> + 'b,
+    F: IntoIterator<Item = (I1, I2)>,
+> CopyOp<'a, 'b, I1, I2, F>
+{
     /// Consume and run this copy operation.
     ///
     /// # Errors
@@ -39,11 +56,24 @@ impl<'a, F: IntoIterator<Item = (Cow<'a, Path>, Cow<'a, Path>)>> CopyOp<'a, F> {
     }
 }
 
-fn schedule_copies<'a>(
-    CopyOp { files, force }: CopyOp<'a, impl IntoIterator<Item = (Cow<'a, Path>, Cow<'a, Path>)>>,
-    copy: &impl DirectoryOp<(Cow<'a, Path>, Cow<'a, Path>)>,
+fn schedule_copies<
+    'a,
+    'b,
+    I1: Into<Cow<'a, Path>> + 'a,
+    I2: Into<Cow<'b, Path>> + 'b,
+    F: IntoIterator<Item = (I1, I2)>,
+>(
+    CopyOp {
+        files,
+        force,
+        _marker1: _,
+        _marker2: _,
+    }: CopyOp<'a, 'b, I1, I2, F>,
+    copy: &impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)>,
 ) -> Result<(), Error> {
     for (from, to) in files {
+        let from = from.into();
+        let to = to.into();
         if !force {
             match to.symlink_metadata() {
                 Ok(_) => {
@@ -130,7 +160,7 @@ mod compat {
         scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
     }
 
-    pub fn copy_impl<'a>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'a, Path>)> {
+    pub fn copy_impl<'a, 'b>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
         let scheduling = LazyCell::new(|| {
             let (tx, rx) = crossbeam_channel::unbounded();
             (tx, thread::spawn(|| root_worker_thread(rx)))
@@ -483,7 +513,7 @@ mod compat {
 
     struct Impl;
 
-    pub fn copy_impl<'a>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'a, Path>)> {
+    pub fn copy_impl<'a, 'b>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
         Impl
     }
 

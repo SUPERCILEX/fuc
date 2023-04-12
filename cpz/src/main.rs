@@ -2,7 +2,6 @@
 #![feature(let_chains)]
 
 use std::{
-    borrow::Cow,
     cell::LazyCell,
     fs,
     path::{PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
@@ -114,7 +113,7 @@ fn copy(
                 let to = path
                     .file_name()
                     .map_or_else(|| to.clone(), |name| to.join(name));
-                (Cow::Owned(path), Cow::Owned(to))
+                (path, to)
             }))
             .force(force)
             .build()
@@ -132,7 +131,7 @@ fn copy(
                     to
                 };
 
-                (Cow::Owned(from), Cow::Owned(to))
+                (from, to)
             }])
             .force(force)
             .build()

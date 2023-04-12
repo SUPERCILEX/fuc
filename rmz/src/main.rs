@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::{ArgAction, Parser, ValueHint};
 use clap2 as clap;
@@ -68,7 +68,7 @@ fn remove(
     }: Rmz,
 ) -> Result<(), Error> {
     RemoveOp::builder()
-        .files(files.into_iter().map(Cow::Owned))
+        .files(files.into_iter())
         .force(force)
         .preserve_root(preserve_root)
         .build()
