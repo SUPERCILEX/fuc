@@ -42,7 +42,19 @@ Overwrite existing files:
 $ cpz -f from existing
 ```
 
-Other options:
+Flip the argument order (for better composability with other commands for example):
+
+```console
+$ cpz -t to_first from
+```
+
+Force the source files to be copied into the destination by making the path look like a directory:
+
+```console
+$ cpz from dest/
+```
+
+More details:
 
 ```console
 $ cpz --help
@@ -64,6 +76,9 @@ Arguments:
 Options:
   -f, --force
           Overwrite existing files
+
+  -t, --reverse-args
+          Reverse the argument order so that it becomes `cpz <TO> <FROM>...`
 
   -h, --help
           Print help (use `-h` for a summary)

@@ -42,7 +42,7 @@ Ignore non-existent files:
 $ rmz -f non-existent
 ```
 
-Other options:
+More details:
 
 ```console
 $ rmz --help

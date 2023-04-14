@@ -4,6 +4,7 @@
 use std::{
     cell::LazyCell,
     fs,
+    mem::swap,
     path::{PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
 };
 
@@ -38,6 +39,10 @@ struct Cpz {
     /// Overwrite existing files
     #[arg(short, long, default_value_t = false)]
     force: bool,
+
+    /// Reverse the argument order so that it becomes `cpz <TO> <FROM>...`
+    #[arg(short = 't', long, default_value_t = false)]
+    reverse_args: bool,
 
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help (use `--help` for more detail)")]
@@ -79,12 +84,19 @@ fn main() -> error_stack::Result<(), CliError> {
 
 fn copy(
     Cpz {
-        from,
-        to,
+        mut from,
+        mut to,
         force,
+        reverse_args,
         help: _,
     }: Cpz,
 ) -> Result<(), Error> {
+    if reverse_args {
+        swap(&mut to, &mut from[0]);
+    }
+    let from = from;
+    let to = to;
+
     #[allow(clippy::unnested_or_patterns)]
     let is_into_directory = LazyCell::new(|| {
         matches!(
