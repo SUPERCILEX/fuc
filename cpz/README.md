@@ -50,7 +50,7 @@ $ cpz -t to_first from
 
 Force the source files to be copied into the destination by making the path look like a directory:
 
-```console
+```console,ignore
 $ cpz from dest/
 ```
 
