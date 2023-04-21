@@ -171,6 +171,8 @@ mod compat {
             let mut io_uring = IoUring::builder()
                 .setup_coop_taskrun()
                 .setup_single_issuer()
+                .setup_defer_taskrun()
+                .setup_no_offload()
                 .build(URING_ENTRIES.into())
                 .map_io_err(|| "Failed to create io_uring")?;
 
@@ -208,9 +210,10 @@ mod compat {
 
     fn worker_thread(tasks: Receiver<Message>, io_uring_fd: RawFd) -> Result<(), Error> {
         let mut io_uring = IoUring::builder()
-            .setup_attach_wq(io_uring_fd)
             .setup_coop_taskrun()
             .setup_single_issuer()
+            .setup_defer_taskrun()
+            .setup_no_offload()
             .build(URING_ENTRIES.into())
             .map_io_err(|| "Failed to create io_uring")?;
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
