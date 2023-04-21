@@ -1,6 +1,6 @@
 # cp zippy
 
-[![Crates.io](https://img.shields.io/crates/v/cpz?style=flat-square)](https://crates.io/crates/cpz)
+[![Crates.io](https://img.shields.io/crates/v/cpz)](https://crates.io/crates/cpz)
 
 A zippy alternative to `cp`, a tool to copy files and directories.
 
