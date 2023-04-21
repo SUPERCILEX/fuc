@@ -147,11 +147,11 @@ fn add_benches(
     group.bench_with_input(
         BenchmarkId::new("fuc_engine::remove_dir_all", num_files),
         &num_files,
-        |b, num_files| {
+        |b, &num_files| {
             b.iter_with_setup(
                 || {
                     let dir = tempdir().unwrap();
-                    gen_files(dir.path(), *num_files);
+                    gen_files(dir.path(), num_files);
                     dir
                 },
                 |dir| {
@@ -166,11 +166,11 @@ fn add_benches(
     group.bench_with_input(
         BenchmarkId::new("rm_rayon::remove_dir_all", num_files),
         &num_files,
-        |b, num_files| {
+        |b, &num_files| {
             b.iter_with_setup(
                 || {
                     let dir = tempdir().unwrap();
-                    gen_files(dir.path(), *num_files);
+                    gen_files(dir.path(), num_files);
                     dir
                 },
                 |dir| {
@@ -185,11 +185,11 @@ fn add_benches(
     group.bench_with_input(
         BenchmarkId::new("rm_og_crappy::remove_dir_all", num_files),
         &num_files,
-        |b, num_files| {
+        |b, &num_files| {
             b.iter_with_setup(
                 || {
                     let dir = tempdir().unwrap();
-                    gen_files(dir.path(), *num_files);
+                    gen_files(dir.path(), num_files);
                     dir
                 },
                 |dir| {
@@ -204,11 +204,11 @@ fn add_benches(
     group.bench_with_input(
         BenchmarkId::new("fs::remove_dir_all", num_files),
         &num_files,
-        |b, num_files| {
+        |b, &num_files| {
             b.iter_with_setup(
                 || {
                     let dir = tempdir().unwrap();
-                    gen_files(dir.path(), *num_files);
+                    gen_files(dir.path(), num_files);
                     dir
                 },
                 |dir| {
@@ -223,11 +223,11 @@ fn add_benches(
     group.bench_with_input(
         BenchmarkId::new("remove_dir_all::remove_dir_all", num_files),
         &num_files,
-        |b, num_files| {
+        |b, &num_files| {
             b.iter_with_setup(
                 || {
                     let dir = tempdir().unwrap();
-                    gen_files(dir.path(), *num_files);
+                    gen_files(dir.path(), num_files);
                     dir
                 },
                 |dir| {

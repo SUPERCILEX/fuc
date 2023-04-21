@@ -179,11 +179,11 @@ fn just_writes(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("open_memcache", num_bytes),
             &num_bytes,
-            |b, num_bytes| {
+            |b, &num_files| {
                 b.iter_batched(
                     || {
                         let dir = tempdir().unwrap();
-                        let buf = create_random_buffer(usize::try_from(*num_bytes).unwrap(), false);
+                        let buf = create_random_buffer(usize::try_from(num_files).unwrap(), false);
 
                         (dir, buf)
                     },
@@ -203,11 +203,11 @@ fn just_writes(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("open_nocache", num_bytes),
             &num_bytes,
-            |b, num_bytes| {
+            |b, &num_files| {
                 b.iter_batched(
                     || {
                         let dir = tempdir().unwrap();
-                        let buf = create_random_buffer(usize::try_from(*num_bytes).unwrap(), true);
+                        let buf = create_random_buffer(usize::try_from(num_files).unwrap(), true);
 
                         (dir, buf)
                     },
@@ -217,7 +217,7 @@ fn just_writes(c: &mut Criterion) {
                             #[cfg(target_os = "linux")]
                             true,
                         );
-                        out.set_len(*num_bytes).unwrap();
+                        out.set_len(num_files).unwrap();
 
                         out.write_all(&buf).unwrap();
 
@@ -235,9 +235,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("fs::copy", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     copy(files.from, files.to).unwrap();
                     files.dir
@@ -251,11 +251,11 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("copy_file_range", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             use rustix::fs::copy_file_range;
 
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let to = OpenOptions::new()
@@ -264,9 +264,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .create(true)
                         .open(files.to)
                         .unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
 
-                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
+                    let mut bytes_remaining = usize::try_from(num_files).unwrap();
                     while bytes_remaining > 0 {
                         bytes_remaining -=
                             copy_file_range(&from, None, &to, None, bytes_remaining).unwrap();
@@ -282,9 +282,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("buffered", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let reader = BufReader::new(File::open(files.from).unwrap());
                     write_from_buffer(files.to, reader);
@@ -298,9 +298,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("buffered_l1_tuned", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let l1_cache_size = l1_cache_size().unwrap();
                     let reader =
@@ -318,9 +318,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("buffered_readahead_tuned", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let readahead_size = 1 << 17; // See https://eklitzke.org/efficient-file-copying-on-linux
                     let reader =
@@ -339,9 +339,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("buffered_parallel", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     use std::{os::unix::fs::FileExt, thread};
 
@@ -351,7 +351,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
 
                     let from = File::open(files.from).unwrap();
                     let to = File::create(files.to).unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
 
                     let mut results = Vec::with_capacity(usize::try_from(threads).unwrap());
                     for i in 0..threads {
@@ -384,15 +384,15 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("buffered_entire_file", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let mut from = File::open(files.from).unwrap();
                     let mut to = File::create(files.to).unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
 
-                    let mut buf = Vec::with_capacity(usize::try_from(*num_bytes).unwrap());
+                    let mut buf = Vec::with_capacity(usize::try_from(num_files).unwrap());
                     from.read_to_end(&mut buf).unwrap();
                     to.write_all(&buf).unwrap();
 
@@ -406,9 +406,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("mmap_read_only", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let reader = unsafe { Mmap::map(&from) }.unwrap();
@@ -426,14 +426,14 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("mmap_read_only_truncate", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let reader = unsafe { Mmap::map(&from) }.unwrap();
                     let mut to = File::create(files.to).unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
 
                     to.write_all(reader.as_ref()).unwrap();
 
@@ -448,14 +448,14 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("mmap_read_only_fallocate", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let reader = unsafe { Mmap::map(&from) }.unwrap();
                     let mut to = File::create(files.to).unwrap();
-                    allocate(&to, *num_bytes);
+                    allocate(&to, num_files);
 
                     to.write_all(reader.as_ref()).unwrap();
 
@@ -469,9 +469,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("mmap_rw_truncate", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let to = OpenOptions::new()
@@ -480,7 +480,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .create(true)
                         .open(files.to)
                         .unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
                     let reader = unsafe { Mmap::map(&from) }.unwrap();
                     let mut writer = unsafe { MmapOptions::new().map_mut(&to) }.unwrap();
 
@@ -497,11 +497,11 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
     group.bench_with_input(
         BenchmarkId::new("sendfile", num_bytes),
         &num_bytes,
-        |b, num_bytes| {
+        |b, &num_files| {
             use rustix::fs::sendfile;
 
             b.iter_batched(
-                || NormalTempFile::create(*num_bytes, direct_io),
+                || NormalTempFile::create(num_files, direct_io),
                 |files| {
                     let from = File::open(files.from).unwrap();
                     let to = OpenOptions::new()
@@ -510,9 +510,9 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .create(true)
                         .open(files.to)
                         .unwrap();
-                    to.set_len(*num_bytes).unwrap();
+                    to.set_len(num_files).unwrap();
 
-                    let mut bytes_remaining = usize::try_from(*num_bytes).unwrap();
+                    let mut bytes_remaining = usize::try_from(num_files).unwrap();
                     while bytes_remaining > 0 {
                         bytes_remaining -= sendfile(&to, &from, None, bytes_remaining).unwrap();
                     }
