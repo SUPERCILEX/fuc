@@ -241,7 +241,7 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.".to_string())?;
+        unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());

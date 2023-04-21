@@ -2,7 +2,7 @@
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::needless_pass_by_value)]
 
-use std::{io, path::PathBuf};
+use std::{borrow::Cow, io, path::PathBuf};
 
 use thiserror::Error;
 
@@ -13,7 +13,10 @@ mod ops;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("An I/O error occurred")]
-    Io { error: io::Error, context: String },
+    Io {
+        error: io::Error,
+        context: Cow<'static, str>,
+    },
     #[error("An attempt was made to delete `/`")]
     PreserveRoot,
     #[error("Failed to join thread")]
