@@ -19,7 +19,7 @@ thiserror = "1.0.40"
 criterion = "0.4.0"
 ftzz = "2.0.0"
 tempfile = "3.5.0"
-trycmd = "0.14.15"
+trycmd = "0.14.16"
 rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 supercilex-tests = "0.3.2"

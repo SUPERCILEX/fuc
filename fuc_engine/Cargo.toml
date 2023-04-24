@@ -15,7 +15,7 @@ thiserror = "1.0.40"
 typed-builder = "0.14.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.37.11", features = ["fs", "thread", "linux_latest"] }
+rustix = { version = "0.37.19", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rayon = "1.7.0"

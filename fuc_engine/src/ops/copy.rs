@@ -137,7 +137,7 @@ fn schedule_copies<
 mod compat {
     use std::{
         borrow::Cow,
-        cell::Cell,
+        cell::{Cell, LazyCell},
         ffi::{CStr, CString},
         fs::File,
         io,
@@ -162,7 +162,7 @@ mod compat {
     use crate::{
         ops::{
             compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
-            IoErr, LazyCell,
+            IoErr,
         },
         Error,
     };
@@ -197,7 +197,9 @@ mod compat {
         }
 
         fn finish(self) -> Result<(), Error> {
-            if let Some((tasks, thread)) = self.scheduling.into_inner() {
+            let Self { scheduling } = self;
+
+            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }

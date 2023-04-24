@@ -87,8 +87,8 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 #[cfg(target_os = "linux")]
 mod compat {
     use std::{
-        borrow::Cow, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path, sync::Arc,
-        thread, thread::JoinHandle,
+        borrow::Cow, cell::LazyCell, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path,
+        sync::Arc, thread, thread::JoinHandle,
     };
 
     use crossbeam_channel::{Receiver, Sender};
@@ -100,7 +100,7 @@ mod compat {
     use crate::{
         ops::{
             compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
-            IoErr, LazyCell,
+            IoErr,
         },
         Error,
     };
@@ -138,7 +138,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Some((tasks, thread)) = scheduling.into_inner() {
+            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
