@@ -71,7 +71,9 @@ fn main() -> error_stack::Result<(), CliError> {
                     Ok(true) => {
                         let mut file = file.into_os_string();
                         file.push(MAIN_SEPARATOR_STR);
-                        report.attach_printable(format!("Use {file:?} to copy into the directory."))
+                        report.attach_printable(format!(
+                            "Use the path {file:?} to copy into the directory."
+                        ))
                     }
                     Ok(false) | Err(_) => report.attach_printable("Use --force to overwrite."),
                 }
