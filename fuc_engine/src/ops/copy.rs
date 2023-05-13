@@ -288,9 +288,8 @@ mod compat {
                 continue;
             }
             {
-                // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-                let name = file.file_name().to_bytes();
-                if name == b"." || name == b".." {
+                let name = file.file_name();
+                if name == c"." || name == c".." {
                     continue;
                 }
             }
@@ -333,11 +332,8 @@ mod compat {
         from_path: &CString,
         to_path: &CString,
     ) -> Result<(), Error> {
-        // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-        const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
-
         let from_mode = {
-            let from_metadata = statx(from_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::MODE)
+            let from_metadata = statx(from_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::MODE)
                 .map_io_err(|| format!("Failed to stat directory: {from_path:?}"))?;
             Mode::from_raw_mode(from_metadata.stx_mode.into())
         };
@@ -501,10 +497,7 @@ mod compat {
         Ok(if let Some(ino) = root_to_inode {
             ino
         } else {
-            // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-            const EMPTY: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") };
-
-            let to_metadata = statx(to_dir, EMPTY, AtFlags::EMPTY_PATH, StatxFlags::INO)
+            let to_metadata = statx(to_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::INO)
                 .map_io_err(|| format!("Failed to stat directory: {to:?}"))?;
             to_metadata.stx_ino
         })

@@ -214,9 +214,8 @@ mod compat {
         while let Some(file) = raw_dir.next() {
             let file = file.map_io_err(|| format!("Failed to read directory: {:?}", node.path))?;
             {
-                // TODO here and other uses: https://github.com/rust-lang/rust/issues/105723
-                let name = file.file_name().to_bytes();
-                if name == b"." || name == b".." {
+                let name = file.file_name();
+                if name == c"." || name == c".." {
                     continue;
                 }
             }
