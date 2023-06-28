@@ -93,7 +93,7 @@ mod compat {
 
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
-        fs::{cwd, openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir},
+        fs::{openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir, CWD},
         thread::{unshare, UnshareFlags},
     };
 
@@ -202,7 +202,7 @@ mod compat {
         mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
         let dir = openat(
-            cwd(),
+            CWD,
             &node.path,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
@@ -265,7 +265,7 @@ mod compat {
                 ref messages,
             } = *self;
 
-            if let Err(e) = unlinkat(cwd(), path, AtFlags::REMOVEDIR)
+            if let Err(e) = unlinkat(CWD, path, AtFlags::REMOVEDIR)
                 .map_io_err(|| format!("Failed to delete directory: {path:?}"))
             {
                 // If the receiver closed, then another error must have already occurred.

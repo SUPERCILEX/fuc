@@ -152,8 +152,8 @@ mod compat {
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
         fs::{
-            copy_file_range, cwd, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
-            Mode, OFlags, RawDir, StatxFlags,
+            copy_file_range, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
+            Mode, OFlags, RawDir, StatxFlags, CWD,
         },
         io::Errno,
         thread::{unshare, UnshareFlags},
@@ -265,14 +265,14 @@ mod compat {
         mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
         let from_dir = openat(
-            cwd(),
+            CWD,
             &from,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {from:?}"))?;
         let to_dir = openat(
-            cwd(),
+            CWD,
             &to,
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
             Mode::empty(),
@@ -337,7 +337,7 @@ mod compat {
                 .map_io_err(|| format!("Failed to stat directory: {from_path:?}"))?;
             Mode::from_raw_mode(from_metadata.stx_mode.into())
         };
-        match mkdirat(cwd(), to_path, from_mode) {
+        match mkdirat(CWD, to_path, from_mode) {
             Err(Errno::EXIST) => {}
             r => r.map_io_err(|| format!("Failed to create directory: {to_path:?}"))?,
         };

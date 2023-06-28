@@ -10,19 +10,19 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap2 = { version = "4.1.8", features = ["derive", "wrap_help"] }
+clap = { version = "4.3.9", features = ["derive", "wrap_help"] }
 error-stack = "0.3.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
 thiserror = "1.0.40"
 
 [dev-dependencies]
-criterion = "0.4.0"
-ftzz = "2.0.0"
-tempfile = "3.5.0"
+criterion = "0.5.1"
+ftzz = "2.0.1"
+tempfile = "3.6.0"
 trycmd = "0.14.16"
 rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
-supercilex-tests = "0.3.2"
+supercilex-tests = "0.3.3"
 remove_dir_all = "0.8.2"
 
 [[bench]]

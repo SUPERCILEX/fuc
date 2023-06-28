@@ -102,10 +102,10 @@ fn empty_files(c: &mut Criterion) {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
-                use rustix::fs::{cwd, mknodat, FileType, Mode};
+                use rustix::fs::{mknodat, FileType, Mode, CWD};
 
                 mknodat(
-                    cwd(),
+                    CWD,
                     files.to.as_path(),
                     FileType::RegularFile,
                     Mode::empty(),
@@ -150,9 +150,9 @@ fn empty_files(c: &mut Criterion) {
         let files = NormalTempFile::create(0, false);
         let path = files.to.as_path();
         b.iter(|| {
-            use rustix::fs::{cwd, openat, Mode, OFlags};
+            use rustix::fs::{openat, Mode, OFlags, CWD};
 
-            openat(cwd(), path, OFlags::CREATE, Mode::RWXU).unwrap()
+            openat(CWD, path, OFlags::CREATE, Mode::RWXU).unwrap()
         });
     });
 
@@ -532,7 +532,7 @@ fn open_standard(path: &Path, #[cfg(target_os = "linux")] direct_io: bool) -> Fi
     #[cfg(target_os = "linux")]
     if direct_io {
         use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(i32::try_from(rustix::io::PipeFlags::DIRECT.bits()).unwrap());
+        options.custom_flags(i32::try_from(rustix::pipe::PipeFlags::DIRECT.bits()).unwrap());
     }
 
     options.open(path).unwrap()

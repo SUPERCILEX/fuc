@@ -15,7 +15,7 @@ thiserror = "1.0.40"
 typed-builder = "0.14.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.37.19", features = ["fs", "thread", "linux_latest"] }
+rustix = { version = "0.38.0", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rayon = "1.7.0"
@@ -24,7 +24,7 @@ rayon = "1.7.0"
 remove_dir_all = "0.8.2"
 
 [dev-dependencies]
-ftzz = "2.0.0"
+ftzz = "2.0.1"
 rstest = { version = "0.17.0", default-features = false }
-supercilex-tests = "0.3.2"
-tempfile = "3.5.0"
+supercilex-tests = "0.3.3"
+tempfile = "3.6.0"

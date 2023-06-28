@@ -9,7 +9,6 @@ use std::{
 };
 
 use clap::{ArgAction, Parser, ValueHint};
-use clap2 as clap;
 use error_stack::Report;
 use fuc_engine::{CopyOp, Error};
 
@@ -19,6 +18,7 @@ use fuc_engine::{CopyOp, Error};
 #[command(infer_subcommands = true, infer_long_args = true)]
 #[command(disable_help_flag = true)]
 #[command(arg_required_else_help = true)]
+#[command(max_term_width = 100)]
 #[cfg_attr(test, command(help_expected = true))]
 struct Cpz {
     /// The file(s) or directory(ies) to be copied
