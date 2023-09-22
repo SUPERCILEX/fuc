@@ -21,8 +21,6 @@ impl core::marker::Sync for fuc_engine::Error
 impl core::marker::Unpin for fuc_engine::Error
 impl !core::panic::unwind_safe::RefUnwindSafe for fuc_engine::Error
 impl !core::panic::unwind_safe::UnwindSafe for fuc_engine::Error
-impl<E> core::any::Provider for fuc_engine::Error where E: core::error::Error + core::marker::Sized
-pub fn fuc_engine::Error::provide<'a>(&'a self, demand: &mut core::any::Demand<'a>)
 impl<T, U> core::convert::Into<U> for fuc_engine::Error where U: core::convert::From<T>
 pub fn fuc_engine::Error::into(self) -> U
 impl<T, U> core::convert::TryFrom<U> for fuc_engine::Error where U: core::convert::Into<T>
@@ -43,9 +41,9 @@ impl<T> core::convert::From<T> for fuc_engine::Error
 pub fn fuc_engine::Error::from(t: T) -> T
 pub struct fuc_engine::CopyOp<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>>
 impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> fuc_engine::CopyOp<'a, 'b, I1, I2, F>
-pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::builder() -> CopyOpBuilder<'a, 'b, I1, I2, F, ((), (), (), ())>
-impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::run(self) -> core::result::Result<(), fuc_engine::Error>
+impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> fuc_engine::CopyOp<'a, 'b, I1, I2, F>
+pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::builder() -> CopyOpBuilder<'a, 'b, I1, I2, F, ((), (), (), ())>
 impl<'a, 'b, I1: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::fmt::Debug + core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> core::fmt::Debug for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a, 'b, I1, I2, F> core::marker::Send for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::Send, I1: core::marker::Sync, I2: core::marker::Sync
@@ -70,10 +68,10 @@ pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::borrow_mut(&mut self) -> &mut T
 impl<T> core::convert::From<T> for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::from(t: T) -> T
 pub struct fuc_engine::RemoveOp<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>>
-impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>> fuc_engine::RemoveOp<'a, I, F>
-pub fn fuc_engine::RemoveOp<'a, I, F>::builder() -> RemoveOpBuilder<'a, I, F, ((), (), (), ())>
 impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>>, F: core::iter::traits::collect::IntoIterator<Item = I>> fuc_engine::RemoveOp<'a, I, F>
 pub fn fuc_engine::RemoveOp<'a, I, F>::run(self) -> core::result::Result<(), fuc_engine::Error>
+impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>> fuc_engine::RemoveOp<'a, I, F>
+pub fn fuc_engine::RemoveOp<'a, I, F>::builder() -> RemoveOpBuilder<'a, I, F, ((), (), (), ())>
 impl<'a, I: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::fmt::Debug + core::iter::traits::collect::IntoIterator<Item = I>> core::fmt::Debug for fuc_engine::RemoveOp<'a, I, F>
 pub fn fuc_engine::RemoveOp<'a, I, F>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a, I, F> core::marker::Send for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::Send, I: core::marker::Sync
