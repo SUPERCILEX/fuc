@@ -40,6 +40,9 @@ pub enum CliError {
 }
 
 fn main() -> error_stack::Result<(), CliError> {
+    #[cfg(not(debug_assertions))]
+    error_stack::Report::install_debug_hook::<std::panic::Location>(|_, _| {});
+
     let args = Rmz::parse();
 
     remove(args).map_err(|e| {
