@@ -10,7 +10,7 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.4.8", features = ["derive", "wrap_help"] }
+clap = { version = "4.4.10", features = ["derive", "wrap_help"] }
 error-stack = "0.4.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
 thiserror = "1.0.50"
@@ -25,7 +25,7 @@ tempfile = "3.8.1"
 trycmd = "0.14.19"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.38.25", features = ["fs", "pipe"] }
+rustix = { version = "0.38.26", features = ["fs", "pipe"] }
 
 [[bench]]
 name = "copy_methods"
