@@ -12,10 +12,10 @@ pub fuc_engine::Error::NotFound
 pub fuc_engine::Error::NotFound::file: std::path::PathBuf
 pub fuc_engine::Error::PreserveRoot
 impl core::error::Error for fuc_engine::Error
-impl core::fmt::Display for fuc_engine::Error
-pub fn fuc_engine::Error::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::fmt::Debug for fuc_engine::Error
 pub fn fuc_engine::Error::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fuc_engine::Error
+pub fn fuc_engine::Error::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Send for fuc_engine::Error
 impl core::marker::Sync for fuc_engine::Error
 impl core::marker::Unpin for fuc_engine::Error
