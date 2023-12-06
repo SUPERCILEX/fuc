@@ -24,6 +24,7 @@ rm_rayon = { path = "../comparisons/rm_rayon" }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 supercilex-tests = { version = "0.4.2", default-features = false, features = ["clap"] }
 remove_dir_all = "0.8.2"
+io-adapters = "0.1.0"
 
 [[bench]]
 name = "rmz"

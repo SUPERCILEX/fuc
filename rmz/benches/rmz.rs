@@ -1,20 +1,12 @@
-use std::{fmt, fs, fs::File, num::NonZeroU64, path::Path, time::Duration};
+use std::{fs, fs::File, io, num::NonZeroU64, path::Path, time::Duration};
 
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BenchmarkGroup, BenchmarkId,
     Criterion, PlotConfiguration, Throughput,
 };
 use ftzz::generator::{Generator, NumFilesWithRatio};
+use io_adapters::WriteExtension;
 use tempfile::tempdir;
-
-// TODO https://github.com/rust-lang/rust/pull/104389
-struct Sink;
-
-impl fmt::Write for Sink {
-    fn write_str(&mut self, _: &str) -> fmt::Result {
-        Ok(())
-    }
-}
 
 fn uniform(c: &mut Criterion) {
     fn gen_files(dir: &Path, num_files: u64) {
@@ -24,7 +16,7 @@ fn uniform(c: &mut Criterion) {
                 NonZeroU64::new(num_files).unwrap(),
             ))
             .build()
-            .generate(&mut Sink)
+            .generate(&mut io::sink().write_adapter())
             .unwrap();
     }
 
@@ -51,7 +43,7 @@ fn dir_heavy(c: &mut Criterion) {
                 .unwrap(),
             )
             .build()
-            .generate(&mut Sink)
+            .generate(&mut io::sink().write_adapter())
             .unwrap();
     }
 
@@ -75,7 +67,7 @@ fn file_heavy(c: &mut Criterion) {
                 NumFilesWithRatio::new(num_files, num_files).unwrap()
             })
             .build()
-            .generate(&mut Sink)
+            .generate(&mut io::sink().write_adapter())
             .unwrap();
     }
 
@@ -124,7 +116,7 @@ fn deep_dirs(c: &mut Criterion) {
             )
             .max_depth(100)
             .build()
-            .generate(&mut Sink)
+            .generate(&mut io::sink().write_adapter())
             .unwrap();
     }
 

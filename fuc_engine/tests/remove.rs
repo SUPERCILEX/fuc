@@ -1,17 +1,9 @@
-use std::{borrow::Cow, fmt, fs, fs::File, num::NonZeroU64};
+use std::{borrow::Cow, fs, fs::File, io, num::NonZeroU64};
 
 use ftzz::generator::{Generator, NumFilesWithRatio};
+use io_adapters::WriteExtension;
 use rstest::rstest;
 use tempfile::tempdir;
-
-// TODO https://github.com/rust-lang/rust/pull/104389
-struct Sink;
-
-impl fmt::Write for Sink {
-    fn write_str(&mut self, _: &str) -> fmt::Result {
-        Ok(())
-    }
-}
 
 #[test]
 fn non_existent_file_no_force() {
@@ -111,7 +103,7 @@ fn uniform(#[values(1_000, 100_000)] num_files: u64) {
             NonZeroU64::new(num_files).unwrap(),
         ))
         .build()
-        .generate(&mut Sink)
+        .generate(&mut io::sink().write_adapter())
         .unwrap();
 
     fuc_engine::remove_file(&dir).unwrap();

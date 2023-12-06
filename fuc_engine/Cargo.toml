@@ -25,6 +25,7 @@ remove_dir_all = "0.8.2"
 
 [dev-dependencies]
 ftzz = "2.0.3"
+io-adapters = "0.1.0"
 rstest = { version = "0.18.2", default-features = false }
 supercilex-tests = { version = "0.4.2", default-features = false, features = ["api"] }
 tempfile = "3.8.1"

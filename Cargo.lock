@@ -571,6 +571,7 @@ version = "1.1.6"
 dependencies = [
  "crossbeam-channel",
  "ftzz",
+ "io-adapters",
  "rayon",
  "remove_dir_all",
  "rstest",
@@ -748,6 +749,12 @@ dependencies = [
  "equivalent",
  "hashbrown",
 ]
+
+[[package]]
+name = "io-adapters"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccba56fe900d65f7d0e4e3a8265a2ff9ac6f4dbdde52ef2e2eca94c3f932dde0"
 
 [[package]]
 name = "is-terminal"
@@ -1177,6 +1184,7 @@ dependencies = [
  "error-stack",
  "ftzz",
  "fuc_engine",
+ "io-adapters",
  "remove_dir_all",
  "rm_og_crappy",
  "rm_rayon",
