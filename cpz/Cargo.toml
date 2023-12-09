@@ -20,12 +20,12 @@ cache-size = "0.6.0"
 criterion = "0.5.1"
 memmap2 = "0.9.0"
 rand = "0.8.5"
-supercilex-tests = { version = "0.4.2", default-features = false, features = ["clap"] }
+supercilex-tests = { version = "0.4.3", default-features = false, features = ["clap"] }
 tempfile = "3.8.1"
 trycmd = "0.14.19"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.38.26", features = ["fs", "pipe"] }
+rustix = { version = "0.38.28", features = ["fs", "pipe"] }
 
 [[bench]]
 name = "copy_methods"
