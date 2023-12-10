@@ -1,4 +1,11 @@
-use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
+use std::{
+    borrow::Cow,
+    ffi::OsStr,
+    fmt::Debug,
+    fs, io,
+    marker::PhantomData,
+    path::{Path, MAIN_SEPARATOR_STR},
+};
 
 use typed_builder::TypedBuilder;
 
@@ -60,25 +67,42 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
         if preserve_root && file == Path::new("/") {
             return Err(Error::PreserveRoot);
         }
-        let is_dir = match file.symlink_metadata() {
+        let stripped_path = {
+            let trailing_slash_stripped = file
+                .as_os_str()
+                .as_encoded_bytes()
+                .strip_suffix(MAIN_SEPARATOR_STR.as_bytes())
+                .unwrap_or(file.as_os_str().as_encoded_bytes());
+            let path = unsafe { OsStr::from_encoded_bytes_unchecked(trailing_slash_stripped) };
+            Path::new(path)
+        };
+
+        let is_dir = match stripped_path.symlink_metadata() {
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 if force {
                     continue;
                 }
 
                 return Err(Error::NotFound {
-                    file: file.into_owned(),
+                    file: stripped_path.to_path_buf(),
                 });
             }
             r => r,
         }
-        .map_io_err(|| format!("Failed to read metadata for file: {file:?}"))?
+        .map_io_err(|| format!("Failed to read metadata for file: {stripped_path:?}"))?
         .is_dir();
 
         if is_dir {
-            remove.run(file)?;
+            remove.run(
+                if file.as_os_str().len() == stripped_path.as_os_str().len() {
+                    file
+                } else {
+                    Cow::Owned(stripped_path.to_path_buf())
+                },
+            )?;
         } else {
-            fs::remove_file(&file).map_io_err(|| format!("Failed to delete file: {file:?}"))?;
+            fs::remove_file(stripped_path)
+                .map_io_err(|| format!("Failed to delete file: {stripped_path:?}"))?;
         }
     }
     Ok(())
