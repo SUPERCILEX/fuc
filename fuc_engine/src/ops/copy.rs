@@ -191,7 +191,6 @@ mod compat {
                     from: path_buf_to_cstring(from.into_owned())?,
                     to: path_buf_to_cstring(to.into_owned())?,
                     messages: tasks.clone(),
-                    root_to_inode: None,
                 })
                 .map_err(|_| Error::Internal)
         }
@@ -217,21 +216,44 @@ mod compat {
             let mut threads = Vec::with_capacity(available_parallelism);
 
             {
+                let mut root_to_inode = None;
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
+                    let root_to_inode = if let Some(root_to_inode) = root_to_inode {
+                        root_to_inode
+                    } else {
+                        let to_dir = openat(
+                            CWD,
+                            &node.to,
+                            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
+                            Mode::empty(),
+                        )
+                        .map_io_err(|| format!("Failed to open directory: {:?}", node.to))?;
+                        let to_metadata = statx(to_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::INO)
+                            .map_io_err(|| format!("Failed to stat directory: {:?}", node.to))?;
+                        root_to_inode = Some(to_metadata.stx_ino);
+                        to_metadata.stx_ino
+                    };
+
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                || worker_thread(tasks)
+                                move || worker_thread(tasks, root_to_inode)
                             }));
                         }
                     };
                     maybe_spawn();
 
-                    copy_dir(node, &mut buf, &symlink_buf_cache, maybe_spawn)?;
+                    copy_dir(
+                        node,
+                        root_to_inode,
+                        &mut buf,
+                        &symlink_buf_cache,
+                        maybe_spawn,
+                    )?;
                 }
             }
 
@@ -242,24 +264,20 @@ mod compat {
         })
     }
 
-    fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+    fn worker_thread(tasks: Receiver<TreeNode>, root_to_inode: u64) -> Result<(), Error> {
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.".to_string())?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(node, &mut buf, &symlink_buf_cache, || {})?;
+            copy_dir(node, root_to_inode, &mut buf, &symlink_buf_cache, || {})?;
         }
         Ok(())
     }
 
     fn copy_dir(
-        TreeNode {
-            from,
-            to,
-            messages,
-            root_to_inode,
-        }: TreeNode,
+        TreeNode { from, to, messages }: TreeNode,
+        root_to_inode: u64,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
         mut maybe_spawn: impl FnMut(),
@@ -278,7 +296,6 @@ mod compat {
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {to:?}"))?;
-        let root_to_inode = maybe_compute_root_to_inode(&to_dir, &to, root_to_inode)?;
 
         let mut raw_dir = RawDir::new(&from_dir, buf);
         while let Some(file) = raw_dir.next() {
@@ -309,7 +326,6 @@ mod compat {
                         from,
                         to,
                         messages: messages.clone(),
-                        root_to_inode: Some(root_to_inode),
                     })
                     .map_err(|_| Error::Internal)?;
             } else {
@@ -489,25 +505,10 @@ mod compat {
         Ok(())
     }
 
-    fn maybe_compute_root_to_inode(
-        to_dir: impl AsFd,
-        to: &CString,
-        root_to_inode: Option<u64>,
-    ) -> Result<u64, Error> {
-        Ok(if let Some(ino) = root_to_inode {
-            ino
-        } else {
-            let to_metadata = statx(to_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::INO)
-                .map_io_err(|| format!("Failed to stat directory: {to:?}"))?;
-            to_metadata.stx_ino
-        })
-    }
-
     struct TreeNode {
         from: CString,
         to: CString,
         messages: Sender<TreeNode>,
-        root_to_inode: Option<u64>,
     }
 }
 
