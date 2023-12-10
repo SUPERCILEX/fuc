@@ -18,11 +18,11 @@ thiserror = "1.0.50"
 [dev-dependencies]
 criterion = "0.5.1"
 ftzz = "2.0.3"
-io-adapters = "0.1.0"
+io-adapters = "0.3.0"
 remove_dir_all = { version = "0.8.2", features = ["parallel"] }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 rm_rayon = { path = "../comparisons/rm_rayon" }
-supercilex-tests = { version = "0.4.3", default-features = false, features = ["clap"] }
+supercilex-tests = { version = "0.4.4", default-features = false, features = ["clap"] }
 tempfile = "3.8.1"
 trycmd = "0.14.19"
 

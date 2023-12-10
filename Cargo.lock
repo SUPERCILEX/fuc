@@ -752,9 +752,9 @@ dependencies = [
 
 [[package]]
 name = "io-adapters"
-version = "0.1.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccba56fe900d65f7d0e4e3a8265a2ff9ac6f4dbdde52ef2e2eca94c3f932dde0"
+checksum = "0fa801fc0447544dc703e039e880b50296901e20c235337d08bb5e55eec6e500"
 
 [[package]]
 name = "is-terminal"
@@ -1419,9 +1419,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "supercilex-tests"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd7a0e1f825df00e78f84861e10b104e208ef40df2f9f832734aabe6228726f0"
+checksum = "0d8799f9946d45ed11bea61c3818e174e2f6f1ae2ac02821f4fd241a7d0a3000"
 dependencies = [
  "clap_builder",
  "expect-test",
