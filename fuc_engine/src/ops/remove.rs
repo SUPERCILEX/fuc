@@ -111,8 +111,18 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 #[cfg(target_os = "linux")]
 mod compat {
     use std::{
-        borrow::Cow, cell::LazyCell, ffi::CString, mem::MaybeUninit, num::NonZeroUsize, path::Path,
-        sync::Arc, thread, thread::JoinHandle,
+        borrow::Cow,
+        cell::LazyCell,
+        env::{current_dir, set_current_dir},
+        ffi::{CStr, CString, OsStr},
+        fs,
+        mem::MaybeUninit,
+        num::NonZeroUsize,
+        os::unix::ffi::OsStrExt,
+        path::{Path, PathBuf},
+        sync::Arc,
+        thread,
+        thread::JoinHandle,
     };
 
     use crossbeam_channel::{Receiver, Sender};
@@ -171,6 +181,8 @@ mod compat {
     }
 
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+        unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
+
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
@@ -205,11 +217,43 @@ mod compat {
     }
 
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
+        unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
             delete_dir(message, &mut buf, || {})?;
+        }
+        Ok(())
+    }
+
+    #[cold]
+    fn long_path_fallback_deletion(parent: &CString, child: &CStr) -> Result<(), Error> {
+        struct CurrentDir(PathBuf);
+
+        impl CurrentDir {
+            fn new() -> Result<Self, Error> {
+                Ok(Self(
+                    current_dir().map_io_err(|| "Failed to get current directory")?,
+                ))
+            }
+        }
+
+        impl Drop for CurrentDir {
+            fn drop(&mut self) {
+                set_current_dir(&self.0).expect("Failed to restore current dir");
+            }
+        }
+
+        let _guard = CurrentDir::new()?;
+        {
+            let parent = Path::new(OsStr::from_bytes(parent.as_bytes()));
+            set_current_dir(parent)
+                .map_io_err(|| format!("Failed to set current directory: {parent:?}"))?;
+        }
+        {
+            let child = Path::new(OsStr::from_bytes(child.to_bytes()));
+            fs::remove_dir_all(child)
+                .map_io_err(|| format!("Failed to delete directory and its contents: {child:?}"))?;
         }
         Ok(())
     }
@@ -258,6 +302,13 @@ mod compat {
                 t => t,
             };
             if file_type == FileType::Directory {
+                if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes()
+                    > 4096
+                {
+                    long_path_fallback_deletion(&node.as_ref().path, file.file_name())?;
+                    continue;
+                }
+
                 maybe_spawn();
 
                 let node = match node {

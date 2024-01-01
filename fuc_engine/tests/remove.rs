@@ -93,6 +93,34 @@ fn symbolic_link_delete_link() {
     assert!(root.path().exists());
 }
 
+#[test]
+#[cfg(unix)]
+fn extremely_long_file_name() {
+    use std::{
+        env::{current_dir, set_current_dir},
+        fs::create_dir,
+    };
+
+    let cwd = current_dir().unwrap();
+    let root = tempdir().unwrap();
+    set_current_dir(&root).unwrap();
+
+    for _ in 0..10_000 {
+        create_dir("dir").unwrap();
+        set_current_dir("dir").unwrap();
+    }
+    File::create("file").unwrap();
+    set_current_dir(cwd).unwrap();
+
+    let target = root.path().join("dir");
+    assert!(target.exists());
+
+    fuc_engine::remove_file(&target).unwrap();
+
+    assert!(!target.exists());
+    assert!(root.path().exists());
+}
+
 #[rstest]
 fn uniform(#[values(1_000, 100_000)] num_files: u64) {
     let root = tempdir().unwrap();
