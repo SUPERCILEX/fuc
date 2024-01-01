@@ -5,7 +5,7 @@ pub fuc_engine::Error::AlreadyExists::file: std::path::PathBuf
 pub fuc_engine::Error::BadPath
 pub fuc_engine::Error::Internal
 pub fuc_engine::Error::Io
-pub fuc_engine::Error::Io::context: alloc::string::String
+pub fuc_engine::Error::Io::context: alloc::borrow::Cow<'static, str>
 pub fuc_engine::Error::Io::error: std::io::error::Error
 pub fuc_engine::Error::Join
 pub fuc_engine::Error::NotFound

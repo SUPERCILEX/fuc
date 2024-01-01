@@ -1,4 +1,4 @@
-use std::io;
+use std::{borrow::Cow, io};
 
 pub use copy::{copy_file, CopyOp};
 #[cfg(target_os = "linux")]
@@ -11,14 +11,17 @@ mod copy;
 mod remove;
 
 trait IoErr<Out> {
-    fn map_io_err(self, f: impl FnOnce() -> String) -> Out;
+    fn map_io_err<I: Into<Cow<'static, str>>>(self, f: impl FnOnce() -> I) -> Out;
 }
 
 impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
-    fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
+    fn map_io_err<I: Into<Cow<'static, str>>>(
+        self,
+        context: impl FnOnce() -> I,
+    ) -> Result<T, Error> {
         self.map_err(|error| Error::Io {
             error,
-            context: context(),
+            context: context().into(),
         })
     }
 }
@@ -26,6 +29,7 @@ impl<T> IoErr<Result<T, Error>> for Result<T, io::Error> {
 #[cfg(target_os = "linux")]
 mod linux {
     use std::{
+        borrow::Cow,
         ffi::{CStr, CString, OsStr, OsString},
         io,
         os::unix::{
@@ -40,7 +44,10 @@ mod linux {
     use crate::{ops::IoErr, Error};
 
     impl<T> IoErr<Result<T, Error>> for Result<T, rustix::io::Errno> {
-        fn map_io_err(self, context: impl FnOnce() -> String) -> Result<T, Error> {
+        fn map_io_err<I: Into<Cow<'static, str>>>(
+            self,
+            context: impl FnOnce() -> I,
+        ) -> Result<T, Error> {
             self.map_err(io::Error::from).map_io_err(context)
         }
     }

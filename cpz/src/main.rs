@@ -120,7 +120,7 @@ fn copy(
     if from.len() > 1 || *is_into_directory {
         fs::create_dir_all(&to).map_err(|error| Error::Io {
             error,
-            context: format!("Failed to create directory {to:?}"),
+            context: format!("Failed to create directory {to:?}").into(),
         })?;
     }
 
