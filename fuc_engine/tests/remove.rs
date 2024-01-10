@@ -94,7 +94,7 @@ fn symbolic_link_delete_link() {
 }
 
 #[test]
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn extremely_long_file_name() {
     use std::{
         env::{current_dir, set_current_dir},
