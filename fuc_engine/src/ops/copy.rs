@@ -398,7 +398,7 @@ mod compat {
         let mut total_copied = 0;
         loop {
             let byte_copied =
-                match copy_file_range(&from, None, &to, None, usize::MAX - total_copied) {
+                match copy_file_range(&from, None, &to, None, usize::MAX / 2 - total_copied) {
                     Err(Errno::XDEV) if total_copied == 0 => {
                         return copy_any_file(from, to, file_name, from_path);
                     }
