@@ -10,22 +10,22 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.4.11", features = ["derive", "wrap_help"] }
+clap = { version = "4.4.18", features = ["derive", "wrap_help"] }
 error-stack = "0.4.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
-thiserror = "1.0.50"
+thiserror = "1.0.56"
 
 [dev-dependencies]
 cache-size = "0.6.0"
 criterion = "0.5.1"
-memmap2 = "0.9.0"
+memmap2 = "0.9.3"
 rand = "0.8.5"
 supercilex-tests = { version = "0.4.4", default-features = false, features = ["clap"] }
-tempfile = "3.8.1"
-trycmd = "0.14.19"
+tempfile = "3.9.0"
+trycmd = "0.14.20"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.38.28", features = ["fs", "pipe"] }
+rustix = { version = "0.38.30", features = ["fs", "pipe"] }
 
 [[bench]]
 name = "copy_methods"
