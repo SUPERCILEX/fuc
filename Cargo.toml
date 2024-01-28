@@ -36,4 +36,5 @@ panic = "abort"
 [profile.dr]
 inherits = "release"
 debug = true
+debug-assertions = true
 strip = false

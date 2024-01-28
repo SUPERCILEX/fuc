@@ -53,6 +53,10 @@ impl<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>> RemoveOp<'a, I, F> {
     }
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(level = "trace", skip(files, remove))
+)]
 fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
     RemoveOp {
         files,
@@ -118,7 +122,10 @@ mod compat {
         fs,
         mem::MaybeUninit,
         num::NonZeroUsize,
-        os::unix::ffi::OsStrExt,
+        os::{
+            fd::{AsFd, OwnedFd},
+            unix::ffi::OsStrExt,
+        },
         path::{Path, PathBuf},
         sync::Arc,
         thread,
@@ -156,6 +163,7 @@ mod compat {
     impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)>
         DirectoryOp<Cow<'_, Path>> for Impl<LF>
     {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
             let Self { ref scheduling } = *self;
 
@@ -169,6 +177,7 @@ mod compat {
                 .map_err(|_| Error::Internal)
         }
 
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
@@ -180,6 +189,7 @@ mod compat {
         }
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
 
@@ -196,6 +206,13 @@ mod compat {
                 for message in &tasks {
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
+                            #[cfg(feature = "tracing")]
+                            tracing::event!(
+                                tracing::Level::TRACE,
+                                available_parallelism,
+                                "Spawning new thread."
+                            );
+
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
@@ -205,7 +222,7 @@ mod compat {
                     };
                     maybe_spawn();
 
-                    delete_dir(message, &mut buf, maybe_spawn)?;
+                    process_dir(message, &mut buf, maybe_spawn)?;
                 }
             }
 
@@ -216,67 +233,26 @@ mod compat {
         })
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
-            delete_dir(message, &mut buf, || {})?;
+            process_dir(message, &mut buf, || {})?;
         }
         Ok(())
     }
 
-    #[cold]
-    fn long_path_fallback_deletion(parent: &CString, child: &CStr) -> Result<(), Error> {
-        struct CurrentDir(PathBuf);
-
-        impl CurrentDir {
-            fn new() -> Result<Self, Error> {
-                Ok(Self(
-                    current_dir().map_io_err(|| "Failed to get current directory")?,
-                ))
-            }
-        }
-
-        impl Drop for CurrentDir {
-            fn drop(&mut self) {
-                set_current_dir(&self.0).expect("Failed to restore current dir");
-            }
-        }
-
-        let _guard = CurrentDir::new()?;
-        {
-            let parent = Path::new(OsStr::from_bytes(parent.as_bytes()));
-            set_current_dir(parent)
-                .map_io_err(|| format!("Failed to set current directory: {parent:?}"))?;
-        }
-        {
-            let child = Path::new(OsStr::from_bytes(child.to_bytes()));
-            fs::remove_dir_all(child)
-                .map_io_err(|| format!("Failed to delete directory and its contents: {child:?}"))?;
-        }
-        Ok(())
-    }
-
-    fn delete_dir(
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(node, buf, maybe_spawn))
+    )]
+    fn process_dir(
         node: TreeNode,
         buf: &mut [MaybeUninit<u8>],
-        mut maybe_spawn: impl FnMut(),
+        maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
-        enum Arcable {
-            Raw(TreeNode),
-            Arced(Arc<TreeNode>),
-        }
-
-        impl AsRef<TreeNode> for Arcable {
-            fn as_ref(&self) -> &TreeNode {
-                match self {
-                    Self::Raw(node) => node,
-                    Self::Arced(arc) => arc,
-                }
-            }
-        }
-
         let dir = openat(
             CWD,
             &node.path,
@@ -284,6 +260,42 @@ mod compat {
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
+        let node = delete_dir_contents(node, dir, buf, maybe_spawn)?;
+        delete_dir(node)
+    }
+
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(node, dir, buf, maybe_spawn))
+    )]
+    fn delete_dir_contents(
+        node: TreeNode,
+        dir: OwnedFd,
+        buf: &mut [MaybeUninit<u8>],
+        mut maybe_spawn: impl FnMut(),
+    ) -> Result<Option<TreeNode>, Error> {
+        enum Arcable<T> {
+            Raw(T),
+            Arced(Arc<T>),
+        }
+
+        impl<T> Arcable<T> {
+            fn into_inner(this: Self) -> Option<T> {
+                match this {
+                    Self::Raw(t) => Some(t),
+                    Self::Arced(arc) => Arc::into_inner(arc),
+                }
+            }
+        }
+
+        impl<T> AsRef<T> for Arcable<T> {
+            fn as_ref(&self) -> &T {
+                match self {
+                    Self::Raw(node) => node,
+                    Self::Arced(arc) => arc,
+                }
+            }
+        }
 
         let mut node = Arcable::Raw(node);
         let mut raw_dir = RawDir::new(&dir, buf);
@@ -327,19 +339,15 @@ mod compat {
                     })
                     .map_err(|_| Error::Internal)?;
             } else {
-                unlinkat(&dir, file.file_name(), AtFlags::empty()).map_io_err(|| {
-                    format!(
-                        "Failed to delete file: {:?}",
-                        join_cstr_paths(&node.as_ref().path, file.file_name())
-                    )
-                })?;
+                delete_file(node.as_ref(), &dir, file.file_name())?;
             }
         }
 
-        let mut node = match node {
-            Arcable::Raw(node) => Some(node),
-            Arcable::Arced(arc) => Arc::into_inner(arc),
-        };
+        Ok(Arcable::into_inner(node))
+    }
+
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(node)))]
+    fn delete_dir(mut node: Option<TreeNode>) -> Result<(), Error> {
         let mut result = Ok(());
         while let Some(TreeNode {
             ref path,
@@ -354,6 +362,52 @@ mod compat {
             node = parent.and_then(Arc::into_inner);
         }
         result
+    }
+
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(node, dir))
+    )]
+    fn delete_file(node: &TreeNode, dir: impl AsFd, file: &CStr) -> Result<(), Error> {
+        unlinkat(&dir, file, AtFlags::empty()).map_io_err(|| {
+            format!(
+                "Failed to delete file: {:?}",
+                join_cstr_paths(&node.path, file)
+            )
+        })
+    }
+
+    #[cold]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+    fn long_path_fallback_deletion(parent: &CString, child: &CStr) -> Result<(), Error> {
+        struct CurrentDir(PathBuf);
+
+        impl CurrentDir {
+            fn new() -> Result<Self, Error> {
+                Ok(Self(
+                    current_dir().map_io_err(|| "Failed to get current directory")?,
+                ))
+            }
+        }
+
+        impl Drop for CurrentDir {
+            fn drop(&mut self) {
+                set_current_dir(&self.0).expect("Failed to restore current dir");
+            }
+        }
+
+        let _guard = CurrentDir::new()?;
+        {
+            let parent = Path::new(OsStr::from_bytes(parent.as_bytes()));
+            set_current_dir(parent)
+                .map_io_err(|| format!("Failed to set current directory: {parent:?}"))?;
+        }
+        {
+            let child = Path::new(OsStr::from_bytes(child.to_bytes()));
+            fs::remove_dir_all(child)
+                .map_io_err(|| format!("Failed to delete directory and its contents: {child:?}"))?;
+        }
+        Ok(())
     }
 
     struct TreeNode {

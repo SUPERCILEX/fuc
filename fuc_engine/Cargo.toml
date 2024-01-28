@@ -12,13 +12,14 @@ license.workspace = true
 [dependencies]
 crossbeam-channel = "0.5.11"
 thiserror = "1.0.56"
+tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
 typed-builder = "0.18.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "0.38.30", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-rayon = "1.8.0"
+rayon = "1.8.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 remove_dir_all = { version = "0.8.2", features = ["parallel"] }

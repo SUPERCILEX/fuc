@@ -34,14 +34,49 @@ struct Rmz {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum CliError {
+enum CliError {
     #[error("{0}")]
     Wrapper(String),
 }
 
+#[cfg(feature = "trace")]
+#[global_allocator]
+static GLOBAL: tracy_client::ProfiledAllocator<std::alloc::System> =
+    tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
+
 fn main() -> error_stack::Result<(), CliError> {
     #[cfg(not(debug_assertions))]
     error_stack::Report::install_debug_hook::<std::panic::Location>(|_, _| {});
+
+    #[cfg(feature = "trace")]
+    {
+        use tracing_subscriber::{
+            fmt::format::DefaultFields, layer::SubscriberExt, util::SubscriberInitExt,
+        };
+
+        #[derive(Default)]
+        struct Config(DefaultFields);
+
+        impl tracing_tracy::Config for Config {
+            type Formatter = DefaultFields;
+
+            fn formatter(&self) -> &Self::Formatter {
+                &self.0
+            }
+
+            fn stack_depth(&self, _: &tracing::Metadata<'_>) -> u16 {
+                32
+            }
+
+            fn format_fields_in_zone_name(&self) -> bool {
+                false
+            }
+        }
+
+        tracing_subscriber::registry()
+            .with(tracing_tracy::TracyLayer::new(Config::default()))
+            .init();
+    };
 
     let args = Rmz::parse();
 

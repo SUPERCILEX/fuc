@@ -14,6 +14,10 @@ clap = { version = "4.4.18", features = ["derive", "wrap_help"] }
 error-stack = "0.4.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
 thiserror = "1.0.56"
+tracing = { version = "0.1.40", features = ["release_max_level_off"], optional = true }
+tracing-subscriber = { version = "0.3.18", optional = true }
+tracing-tracy = { version = "0.11.0", features = ["flush-on-exit"], optional = true }
+tracy-client = { version = "0.17.0", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -25,6 +29,9 @@ rm_rayon = { path = "../comparisons/rm_rayon" }
 supercilex-tests = { version = "0.4.4", default-features = false, features = ["clap"] }
 tempfile = "3.9.0"
 trycmd = "0.14.20"
+
+[features]
+trace = ["fuc_engine/tracing", "dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy", "dep:tracy-client"]
 
 [[bench]]
 name = "rmz"

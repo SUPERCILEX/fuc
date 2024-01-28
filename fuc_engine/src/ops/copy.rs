@@ -56,6 +56,10 @@ impl<
     }
 }
 
+#[cfg_attr(
+    feature = "tracing",
+    tracing::instrument(level = "trace", skip(files, copy))
+)]
 fn schedule_copies<
     'a,
     'b,
@@ -184,6 +188,7 @@ mod compat {
     impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)>
         DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl<LF>
     {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
             let (tasks, _) = &*self.scheduling;
             tasks
@@ -195,6 +200,7 @@ mod compat {
                 .map_err(|_| Error::Internal)
         }
 
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
@@ -206,6 +212,7 @@ mod compat {
         }
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
@@ -238,6 +245,13 @@ mod compat {
 
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
+                            #[cfg(feature = "tracing")]
+                            tracing::event!(
+                                tracing::Level::TRACE,
+                                available_parallelism,
+                                "Spawning new thread."
+                            );
+
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
@@ -264,6 +278,7 @@ mod compat {
         })
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread(tasks: Receiver<TreeNode>, root_to_inode: u64) -> Result<(), Error> {
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
 
@@ -275,6 +290,10 @@ mod compat {
         Ok(())
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(messages, buf, symlink_buf_cache, maybe_spawn))
+    )]
     fn copy_dir(
         TreeNode { from, to, messages }: TreeNode,
         root_to_inode: u64,
@@ -343,6 +362,10 @@ mod compat {
         Ok(())
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from_dir))
+    )]
     pub fn copy_one_dir(
         from_dir: impl AsFd,
         from_path: &CString,
@@ -361,6 +384,10 @@ mod compat {
         Ok(())
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from_dir, to_dir, symlink_buf_cache))
+    )]
     fn copy_one_file(
         from_dir: impl AsFd,
         to_dir: impl AsFd,
@@ -389,6 +416,10 @@ mod compat {
         }
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from, to))
+    )]
     fn copy_regular_file(
         from: OwnedFd,
         to: OwnedFd,
@@ -418,6 +449,10 @@ mod compat {
     }
 
     #[cold]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from, to))
+    )]
     fn copy_any_file(
         from: OwnedFd,
         to: OwnedFd,
@@ -434,6 +469,10 @@ mod compat {
             .map(|_| ())
     }
 
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from_dir, to_dir))
+    )]
     fn prep_regular_file(
         from_dir: impl AsFd,
         to_dir: impl AsFd,
@@ -478,6 +517,10 @@ mod compat {
     }
 
     #[cold]
+    #[cfg_attr(
+        feature = "tracing",
+        tracing::instrument(level = "trace", skip(from_dir, to_dir, symlink_buf_cache))
+    )]
     fn copy_symlink(
         from_dir: impl AsFd,
         to_dir: impl AsFd,

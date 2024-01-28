@@ -52,10 +52,12 @@ mod linux {
         }
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     pub fn path_buf_to_cstring(buf: PathBuf) -> Result<CString, Error> {
         CString::new(OsString::from(buf).into_vec()).map_err(|_| Error::BadPath)
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     pub fn concat_cstrs(prefix: &CString, name: &CStr) -> CString {
         let prefix = prefix.as_bytes();
         let name = name.to_bytes_with_nul();
@@ -67,12 +69,14 @@ mod linux {
         unsafe { CString::from_vec_with_nul_unchecked(path) }
     }
 
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     pub fn join_cstr_paths(path: &CString, name: &CStr) -> PathBuf {
         Path::new(OsStr::from_bytes(path.as_bytes()))
             .join(Path::new(OsStr::from_bytes(name.to_bytes())))
     }
 
     #[cold]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(dir)))]
     pub fn get_file_type(
         dir: impl AsFd,
         file_name: &CStr,

@@ -5,4 +5,4 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-rayon = "1.8.0"
+rayon = "1.8.1"
