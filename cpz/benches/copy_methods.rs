@@ -262,6 +262,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .read(true)
                         .write(true)
                         .create(true)
+                        .truncate(false)
                         .open(files.to)
                         .unwrap();
                     to.set_len(num_files).unwrap();
@@ -478,6 +479,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .read(true)
                         .write(true)
                         .create(true)
+                        .truncate(false)
                         .open(files.to)
                         .unwrap();
                     to.set_len(num_files).unwrap();
@@ -508,6 +510,7 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
                         .read(true)
                         .write(true)
                         .create(true)
+                        .truncate(false)
                         .open(files.to)
                         .unwrap();
                     to.set_len(num_files).unwrap();

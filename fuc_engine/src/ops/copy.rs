@@ -560,7 +560,7 @@ mod compat {
             f.debug_struct("TreeNode")
                 .field("from", &self.from)
                 .field("to", &self.to)
-                .finish()
+                .finish_non_exhaustive()
         }
     }
 }
