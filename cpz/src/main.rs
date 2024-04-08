@@ -68,7 +68,8 @@ fn main() -> error_stack::Result<(), CliError> {
     #[cfg(feature = "trace")]
     {
         use tracing_subscriber::{
-            fmt::format::DefaultFields, layer::SubscriberExt, util::SubscriberInitExt,
+            filter::LevelFilter, fmt::format::DefaultFields, layer::SubscriberExt,
+            util::SubscriberInitExt, EnvFilter,
         };
 
         #[derive(Default)]
@@ -92,8 +93,73 @@ fn main() -> error_stack::Result<(), CliError> {
 
         tracing_subscriber::registry()
             .with(tracing_tracy::TracyLayer::new(Config::default()))
+            .with(
+                EnvFilter::builder()
+                    .with_default_directive(LevelFilter::TRACE.into())
+                    .from_env_lossy(),
+            )
             .init();
-    };
+    }
+    #[cfg(feature = "progress")]
+    {
+        use std::time::Duration;
+
+        use indicatif::{ProgressState, ProgressStyle};
+        use tracing::level_filters::LevelFilter;
+        use tracing_indicatif::IndicatifLayer;
+        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+        let indicatif_layer = IndicatifLayer::new()
+            .with_progress_style(
+                ProgressStyle::with_template(
+                    "{color_start}{span_child_prefix}{span_fields} -- {span_name} {wide_msg} \
+                     {elapsed_subsec}{color_end}",
+                )
+                .unwrap()
+                .with_key(
+                    "elapsed_subsec",
+                    |state: &ProgressState, writer: &mut dyn std::fmt::Write| {
+                        let seconds = state.elapsed().as_secs();
+                        let sub_seconds = (state.elapsed().as_millis() % 1000) / 100;
+                        let _ = write!(writer, "{}.{}s", seconds, sub_seconds);
+                    },
+                )
+                .with_key(
+                    "color_start",
+                    |state: &ProgressState, writer: &mut dyn std::fmt::Write| {
+                        let elapsed = state.elapsed();
+
+                        if elapsed > Duration::from_secs(8) {
+                            // Red
+                            let _ = write!(writer, "\x1b[{}m", 1 + 30);
+                        } else if elapsed > Duration::from_secs(4) {
+                            // Yellow
+                            let _ = write!(writer, "\x1b[{}m", 3 + 30);
+                        }
+                    },
+                )
+                .with_key(
+                    "color_end",
+                    |state: &ProgressState, writer: &mut dyn std::fmt::Write| {
+                        if state.elapsed() > Duration::from_secs(4) {
+                            let _ = write!(writer, "\x1b[0m");
+                        }
+                    },
+                ),
+            )
+            .with_span_child_prefix_symbol("↳ ")
+            .with_span_child_prefix_indent(" ");
+
+        tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_writer(indicatif_layer.get_stderr_writer()))
+            .with(indicatif_layer)
+            .with(
+                EnvFilter::builder()
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env_lossy(),
+            )
+            .init();
+    }
 
     let args = Cpz::parse();
 

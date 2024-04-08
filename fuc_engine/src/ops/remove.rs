@@ -119,6 +119,7 @@ mod compat {
         cell::LazyCell,
         env::{current_dir, set_current_dir},
         ffi::{CStr, CString, OsStr},
+        fmt::{Debug, Formatter},
         fs,
         mem::MaybeUninit,
         num::NonZeroUsize,
@@ -222,7 +223,7 @@ mod compat {
                     };
                     maybe_spawn();
 
-                    process_dir(message, &mut buf, maybe_spawn)?;
+                    delete_dir(message, &mut buf, maybe_spawn)?;
                 }
             }
 
@@ -239,16 +240,16 @@ mod compat {
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
-            process_dir(message, &mut buf, || {})?;
+            delete_dir(message, &mut buf, || {})?;
         }
         Ok(())
     }
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "trace", skip(node, buf, maybe_spawn))
+        tracing::instrument(level = "info", skip(buf, maybe_spawn))
     )]
-    fn process_dir(
+    fn delete_dir(
         node: TreeNode,
         buf: &mut [MaybeUninit<u8>],
         maybe_spawn: impl FnMut(),
@@ -261,12 +262,12 @@ mod compat {
         )
         .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
         let node = delete_dir_contents(node, dir, buf, maybe_spawn)?;
-        delete_dir(node)
+        delete_empty_dir_chain(node)
     }
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "trace", skip(node, dir, buf, maybe_spawn))
+        tracing::instrument(level = "trace", skip(dir, buf, maybe_spawn))
     )]
     fn delete_dir_contents(
         node: TreeNode,
@@ -346,8 +347,8 @@ mod compat {
         Ok(Arcable::into_inner(node))
     }
 
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(node)))]
-    fn delete_dir(mut node: Option<TreeNode>) -> Result<(), Error> {
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+    fn delete_empty_dir_chain(mut node: Option<TreeNode>) -> Result<(), Error> {
         let mut result = Ok(());
         while let Some(TreeNode {
             ref path,
@@ -364,10 +365,7 @@ mod compat {
         result
     }
 
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "trace", skip(node, dir))
-    )]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug", skip(dir)))]
     fn delete_file(node: &TreeNode, dir: impl AsFd, file: &CStr) -> Result<(), Error> {
         unlinkat(&dir, file, AtFlags::empty()).map_io_err(|| {
             format!(
@@ -414,6 +412,12 @@ mod compat {
         path: CString,
         parent: Option<Arc<TreeNode>>,
         messages: Sender<TreeNode>,
+    }
+
+    impl Debug for TreeNode {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            self.path.fmt(f)
+        }
     }
 }
 

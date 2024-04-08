@@ -143,6 +143,7 @@ mod compat {
         borrow::Cow,
         cell::{Cell, LazyCell},
         ffi::{CStr, CString},
+        fmt::{Debug, Formatter},
         fs::File,
         io,
         mem::MaybeUninit,
@@ -292,7 +293,7 @@ mod compat {
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "trace", skip(messages, buf, symlink_buf_cache, maybe_spawn))
+        tracing::instrument(level = "info", skip(messages, buf, symlink_buf_cache, maybe_spawn))
     )]
     fn copy_dir(
         TreeNode { from, to, messages }: TreeNode,
@@ -386,7 +387,7 @@ mod compat {
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "trace", skip(from_dir, to_dir, symlink_buf_cache))
+        tracing::instrument(level = "debug", skip(from_dir, to_dir, symlink_buf_cache))
     )]
     fn copy_one_file(
         from_dir: impl AsFd,
@@ -552,6 +553,15 @@ mod compat {
         from: CString,
         to: CString,
         messages: Sender<TreeNode>,
+    }
+
+    impl Debug for TreeNode {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("TreeNode")
+                .field("from", &self.from)
+                .field("to", &self.to)
+                .finish()
+        }
     }
 }
 
