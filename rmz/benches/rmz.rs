@@ -4,7 +4,7 @@ use criterion::{
     criterion_group, criterion_main, measurement::WallTime, AxisScale, BenchmarkGroup, BenchmarkId,
     Criterion, PlotConfiguration, Throughput,
 };
-use ftzz::generator::{Generator, NumFilesWithRatio};
+use ftzz::{Generator, NumFilesWithRatio};
 use io_adapters::WriteExtension;
 use tempfile::tempdir;
 

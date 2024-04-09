@@ -23,7 +23,7 @@ tracy-client = { version = "0.17.0", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
-ftzz = "2.0.3"
+ftzz = "3.0.0"
 io-adapters = "0.3.0"
 remove_dir_all = { version = "0.8.2", features = ["parallel"] }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }

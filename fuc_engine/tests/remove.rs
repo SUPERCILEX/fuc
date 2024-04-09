@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fs, fs::File, io, num::NonZeroU64};
 
-use ftzz::generator::{Generator, NumFilesWithRatio};
+use ftzz::{Generator, NumFilesWithRatio};
 use io_adapters::WriteExtension;
 use rstest::rstest;
 use tempfile::tempdir;

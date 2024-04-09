@@ -25,7 +25,7 @@ rayon = "1.10.0"
 remove_dir_all = { version = "0.8.2", features = ["parallel"] }
 
 [dev-dependencies]
-ftzz = "2.0.3"
+ftzz = "3.0.0"
 io-adapters = "0.3.0"
 rstest = { version = "0.18.2", default-features = false }
 supercilex-tests = { version = "0.4.4", default-features = false, features = ["api"] }
