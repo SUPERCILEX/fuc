@@ -43,6 +43,10 @@ struct Cpz {
     #[arg(short = 't', long, default_value_t = false)]
     reverse_args: bool,
 
+    /// always follow symbolic links in source
+    #[arg(short = 'L', long, default_value_t = false)]
+    dereference: bool,
+
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help (use `--help` for more detail)")]
     #[arg(long_help = "Print help (use `-h` for a summary)")]
@@ -203,6 +207,7 @@ fn copy(
         mut to,
         force,
         reverse_args,
+        dereference,
         help: _,
     }: Cpz,
 ) -> Result<(), Error> {
@@ -243,6 +248,7 @@ fn copy(
                 (path, to)
             }))
             .force(force)
+            .dereference(dereference)
             .build()
             .run()
     } else {
@@ -261,6 +267,7 @@ fn copy(
                 (from, to)
             }])
             .force(force)
+            .dereference(dereference)
             .build()
             .run()
     }

@@ -30,6 +30,8 @@ pub struct CopyOp<
     files: F,
     #[builder(default = false)]
     force: bool,
+    #[builder(default = false)]
+    dereference: bool,
     #[builder(default)]
     _marker1: PhantomData<&'a I1>,
     #[builder(default)]
@@ -50,7 +52,7 @@ impl<
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let copy = compat::copy_impl();
+        let copy = compat::copy_impl(self.dereference);
         let result = schedule_copies(self, &copy);
         copy.finish().and(result)
     }
@@ -70,6 +72,7 @@ fn schedule_copies<
     CopyOp {
         files,
         force,
+        dereference,
         _marker1: _,
         _marker2: _,
     }: CopyOp<'a, 'b, I1, I2, F>,
@@ -94,9 +97,15 @@ fn schedule_copies<
             }
         }
 
-        let from_metadata = from
+        let from_metadata = if !dereference {
+            from
             .symlink_metadata()
-            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
+            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?
+        } else {
+            from
+            .metadata()
+            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?
+        };
 
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent)
@@ -107,11 +116,7 @@ fn schedule_copies<
         if from_metadata.is_dir() {
             use std::os::unix::fs::{DirBuilderExt, MetadataExt};
             match fs::DirBuilder::new()
-                .mode(
-                    fs::symlink_metadata(&from)
-                        .map_io_err(|| format!("Failed to stat directory: {from:?}"))?
-                        .mode(),
-                )
+                .mode(from_metadata.mode())
                 .create(&to)
             {
                 Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {}
@@ -177,10 +182,10 @@ mod compat {
         scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
     }
 
-    pub fn copy_impl<'a, 'b>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        let scheduling = LazyCell::new(|| {
+    pub fn copy_impl<'a, 'b>(dereference: bool) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
+        let scheduling = LazyCell::new(move || {
             let (tx, rx) = crossbeam_channel::unbounded();
-            (tx, thread::spawn(|| root_worker_thread(rx)))
+            (tx, thread::spawn(move || root_worker_thread(rx, dereference)))
         });
 
         Impl { scheduling }
@@ -214,7 +219,7 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+    fn root_worker_thread(tasks: Receiver<TreeNode>, dereference: bool) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
@@ -256,7 +261,7 @@ mod compat {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                move || worker_thread(tasks, root_to_inode)
+                                move || worker_thread(tasks, root_to_inode, dereference)
                             }));
                         }
                     };
@@ -265,6 +270,7 @@ mod compat {
                     copy_dir(
                         node,
                         root_to_inode,
+                        dereference,
                         &mut buf,
                         &symlink_buf_cache,
                         maybe_spawn,
@@ -280,13 +286,13 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn worker_thread(tasks: Receiver<TreeNode>, root_to_inode: u64) -> Result<(), Error> {
+    fn worker_thread(tasks: Receiver<TreeNode>, root_to_inode: u64, dereference: bool) -> Result<(), Error> {
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(node, root_to_inode, &mut buf, &symlink_buf_cache, || {})?;
+            copy_dir(node, root_to_inode, dereference, &mut buf, &symlink_buf_cache, || {})?;
         }
         Ok(())
     }
@@ -298,6 +304,7 @@ mod compat {
     fn copy_dir(
         TreeNode { from, to, messages }: TreeNode,
         root_to_inode: u64,
+        dereference: bool,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
         mut maybe_spawn: impl FnMut(),
@@ -356,6 +363,7 @@ mod compat {
                     file_type,
                     &from,
                     &to,
+                    dereference,
                     symlink_buf_cache,
                 )?;
             }
@@ -389,6 +397,7 @@ mod compat {
         feature = "tracing",
         tracing::instrument(level = "debug", skip(from_dir, to_dir, symlink_buf_cache))
     )]
+    #[allow(clippy::too_many_arguments)]
     fn copy_one_file(
         from_dir: impl AsFd,
         to_dir: impl AsFd,
@@ -396,9 +405,10 @@ mod compat {
         file_type: FileType,
         from_path: &CString,
         to_path: &CString,
+        dereference: bool,
         symlink_buf_cache: &Cell<Vec<u8>>,
     ) -> Result<(), Error> {
-        if file_type == FileType::Symlink {
+        if !dereference && file_type == FileType::Symlink {
             copy_symlink(
                 from_dir,
                 to_dir,
