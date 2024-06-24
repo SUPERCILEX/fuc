@@ -168,10 +168,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
-name = "cache-size2"
-version = "0.6.1"
+name = "cache-size"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2097abbe78c7a3a3a0215e79a7244b96215fd0c2803fb6558edbefae415c6a1d"
+checksum = "df5c3aca3f278263eecfa3e6d2cd1fdd76029f68a0c9e9ed5ab55f0508e70723"
 dependencies = [
  "raw-cpuid",
 ]
@@ -367,7 +367,7 @@ version = "0.0.0"
 name = "cpz"
 version = "1.1.6"
 dependencies = [
- "cache-size2",
+ "cache-size",
  "clap",
  "criterion",
  "error-stack",
@@ -1192,11 +1192,11 @@ dependencies = [
 
 [[package]]
 name = "raw-cpuid"
-version = "10.7.0"
+version = "11.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c297679cb867470fa8c9f67dbba74a78d78e3e98d7cf2b08d6d71540f797332"
+checksum = "e29830cbb1290e404f24c73af91c5d8d631ce7e128691e9477556b540cd01ecd"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags 2.5.0",
 ]
 
 [[package]]
