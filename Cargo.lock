@@ -168,10 +168,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3e368af43e418a04d52505cf3dbc23dda4e3407ae2fa99fd0e4f308ce546acc"
 
 [[package]]
-name = "cache-size"
-version = "0.6.0"
+name = "cache-size2"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ec8288c102e0fb71065a0bf2127e8b530fce496aac2f2a1a3bce99be7044094"
+checksum = "2097abbe78c7a3a3a0215e79a7244b96215fd0c2803fb6558edbefae415c6a1d"
 dependencies = [
  "raw-cpuid",
 ]
@@ -367,7 +367,7 @@ version = "0.0.0"
 name = "cpz"
 version = "1.1.6"
 dependencies = [
- "cache-size",
+ "cache-size2",
  "clap",
  "criterion",
  "error-stack",
