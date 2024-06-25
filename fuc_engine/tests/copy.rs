@@ -144,3 +144,53 @@ fn symbolic_link_copy_link() {
 
     assert!(to.exists());
 }
+
+#[test]
+#[cfg(unix)]
+fn dereference_symbolic_link_to_regular_file() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    File::create(from.join("file")).unwrap();
+    std::os::unix::fs::symlink("file", from.join("link")).unwrap();
+    let to = root.path().join("to");
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .dereference(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(to.join("file").symlink_metadata().unwrap().is_file());
+    assert!(to.join("link").symlink_metadata().unwrap().is_file());
+}
+
+#[test]
+#[cfg(unix)]
+fn dereference_symbolic_link_to_dir() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    fs::create_dir(from.join("subdir")).unwrap();
+    File::create(from.join("subdir/file")).unwrap();
+    std::os::unix::fs::symlink("subdir", from.join("subdirlink")).unwrap();
+    let to = root.path().join("to");
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .dereference(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(to.join("subdir").symlink_metadata().unwrap().is_dir());
+    assert!(to.join("subdir/file").symlink_metadata().unwrap().is_file());
+    assert!(to.join("subdirlink").symlink_metadata().unwrap().is_dir());
+    assert!(
+        to.join("subdirlink/file")
+            .symlink_metadata()
+            .unwrap()
+            .is_file()
+    );
+}
