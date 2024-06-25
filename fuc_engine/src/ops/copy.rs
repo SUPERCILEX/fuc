@@ -39,12 +39,12 @@ pub struct CopyOp<
 }
 
 impl<
-        'a,
-        'b,
-        I1: Into<Cow<'a, Path>> + 'a,
-        I2: Into<Cow<'b, Path>> + 'b,
-        F: IntoIterator<Item = (I1, I2)>,
-    > CopyOp<'a, 'b, I1, I2, F>
+    'a,
+    'b,
+    I1: Into<Cow<'a, Path>> + 'a,
+    I2: Into<Cow<'b, Path>> + 'b,
+    F: IntoIterator<Item = (I1, I2)>,
+> CopyOp<'a, 'b, I1, I2, F>
 {
     /// Consume and run this copy operation.
     ///
@@ -326,7 +326,13 @@ mod compat {
         let from_dir = openat(
             CWD,
             &from,
-            OFlags::RDONLY | OFlags::DIRECTORY | if dereference { OFlags::empty() } else { OFlags::NOFOLLOW },
+            OFlags::RDONLY
+                | OFlags::DIRECTORY
+                | if dereference {
+                    OFlags::empty()
+                } else {
+                    OFlags::NOFOLLOW
+                },
             Mode::empty(),
         )
         .map_io_err(|| format!("Failed to open directory: {from:?}"))?;
