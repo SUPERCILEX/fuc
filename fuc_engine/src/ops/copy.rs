@@ -604,10 +604,14 @@ mod compat {
         Error,
     };
 
-    struct Impl;
+    struct Impl {
+        dereference: bool,
+    }
 
-    pub fn copy_impl<'a, 'b>() -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        Impl
+    pub fn copy_impl<'a, 'b>(
+        dereference: bool,
+    ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
+        Impl { dereference }
     }
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
@@ -615,6 +619,8 @@ mod compat {
             copy_dir(
                 &from,
                 to,
+                #[cfg(unix)]
+                self.dereference,
                 #[cfg(unix)]
                 None,
             )
@@ -629,6 +635,7 @@ mod compat {
     fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(
         from: P,
         to: Q,
+        #[cfg(unix)] dereference: bool,
         #[cfg(unix)] root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
@@ -654,11 +661,16 @@ mod compat {
                 }
 
                 let to = to.join(dir_entry.file_name());
-                let file_type = dir_entry.file_type()?;
+                let mut file_type = dir_entry.file_type()?;
+                #[cfg(unix)]
+                if dereference && file_type.is_symlink() {
+                    file_type = fs::metadata(dir_entry.file_name())?.file_type();
+                }
+                let file_type = file_type;
 
                 #[cfg(unix)]
                 if file_type.is_dir() {
-                    copy_dir(dir_entry.path(), to, root_to_inode)?;
+                    copy_dir(dir_entry.path(), to, dereference, root_to_inode)?;
                 } else if file_type.is_symlink() {
                     std::os::unix::fs::symlink(fs::read_link(dir_entry.path())?, to)?;
                 } else {
