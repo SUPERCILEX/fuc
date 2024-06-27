@@ -142,6 +142,7 @@ mod compat {
     use std::{
         borrow::Cow,
         cell::{Cell, LazyCell},
+        env,
         ffi::{CStr, CString},
         fmt::{Debug, Formatter},
         fs::File,
@@ -213,8 +214,17 @@ mod compat {
         }
     }
 
+    fn unshare_files() -> Result<(), Error> {
+        if env::var_os("NO_UNSHARE").is_none() {
+            unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
+        }
+        Ok(())
+    }
+
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
+        unshare_files()?;
+
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
@@ -281,7 +291,7 @@ mod compat {
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread(tasks: Receiver<TreeNode>, root_to_inode: u64) -> Result<(), Error> {
-        unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
+        unshare_files()?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());

@@ -117,6 +117,7 @@ mod compat {
     use std::{
         borrow::Cow,
         cell::LazyCell,
+        env,
         env::{current_dir, set_current_dir},
         ffi::{CStr, CString, OsStr},
         fmt::{Debug, Formatter},
@@ -190,9 +191,17 @@ mod compat {
         }
     }
 
+    fn unshare_io() -> Result<(), Error> {
+        if env::var_os("NO_UNSHARE").is_none() {
+            unshare(UnshareFlags::FILES | UnshareFlags::FS)
+                .map_io_err(|| "Failed to unshare I/O.")?;
+        }
+        Ok(())
+    }
+
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
+        unshare_io()?;
 
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
@@ -236,7 +245,7 @@ mod compat {
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare(UnshareFlags::FILES | UnshareFlags::FS).map_io_err(|| "Failed to unshare I/O.")?;
+        unshare_io()?;
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         for message in tasks {
