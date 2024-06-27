@@ -228,6 +228,7 @@ mod compat {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread(tasks: Receiver<TreeNode>, follow_symlinks: bool) -> Result<(), Error> {
         unshare_files()?;
+
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
