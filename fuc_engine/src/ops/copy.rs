@@ -31,6 +31,7 @@ pub struct CopyOp<
     #[builder(default = false)]
     force: bool,
     #[builder(default = false)]
+    #[allow(dead_code)]
     dereference: bool,
     #[builder(default)]
     _marker1: PhantomData<&'a I1>,
@@ -52,7 +53,10 @@ impl<
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let copy = compat::copy_impl(self.dereference);
+        let copy = compat::copy_impl(
+            #[cfg(unix)]
+            self.dereference,
+        );
         let result = schedule_copies(self, &copy);
         copy.finish().and(result)
     }
@@ -605,13 +609,17 @@ mod compat {
     };
 
     struct Impl {
+        #[cfg(unix)]
         dereference: bool,
     }
 
     pub fn copy_impl<'a, 'b>(
-        dereference: bool,
+        #[cfg(unix)] dereference: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        Impl { dereference }
+        Impl {
+            #[cfg(unix)]
+            dereference,
+        }
     }
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
@@ -661,12 +669,20 @@ mod compat {
                 }
 
                 let to = to.join(dir_entry.file_name());
-                let mut file_type = dir_entry.file_type()?;
-                #[cfg(unix)]
-                if dereference && file_type.is_symlink() {
-                    file_type = fs::metadata(dir_entry.file_name())?.file_type();
-                }
-                let file_type = file_type;
+                let file_type = {
+                    #[cfg(unix)]
+                    {
+                        let mut file_type = dir_entry.file_type()?;
+                        if dereference && file_type.is_symlink() {
+                            file_type = fs::metadata(dir_entry.path())?.file_type();
+                        }
+                        file_type
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        dir_entry.file_type()?
+                    }
+                };
 
                 #[cfg(unix)]
                 if file_type.is_dir() {
