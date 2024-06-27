@@ -81,9 +81,9 @@ mod linux {
         dir: impl AsFd,
         file_name: &CStr,
         path: &CString,
-        dereference: bool,
+        follow_symlinks: bool,
     ) -> Result<FileType, Error> {
-        let flags = if dereference {
+        let flags = if follow_symlinks {
             AtFlags::empty()
         } else {
             AtFlags::SYMLINK_NOFOLLOW

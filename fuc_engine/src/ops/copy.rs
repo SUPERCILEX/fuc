@@ -31,8 +31,7 @@ pub struct CopyOp<
     #[builder(default = false)]
     force: bool,
     #[builder(default = false)]
-    #[allow(dead_code)]
-    dereference: bool,
+    follow_symlinks: bool,
     #[builder(default)]
     _marker1: PhantomData<&'a I1>,
     #[builder(default)]
@@ -53,10 +52,7 @@ impl<
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let copy = compat::copy_impl(
-            #[cfg(unix)]
-            self.dereference,
-        );
+        let copy = compat::copy_impl(self.follow_symlinks);
         let result = schedule_copies(self, &copy);
         copy.finish().and(result)
     }
@@ -76,7 +72,7 @@ fn schedule_copies<
     CopyOp {
         files,
         force,
-        dereference: _,
+        follow_symlinks,
         _marker1: _,
         _marker2: _,
     }: CopyOp<'a, 'b, I1, I2, F>,
@@ -101,9 +97,12 @@ fn schedule_copies<
             }
         }
 
-        let from_metadata = from
-            .symlink_metadata()
-            .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
+        let from_metadata = if follow_symlinks {
+            from.metadata()
+        } else {
+            from.symlink_metadata()
+        }
+        .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
 
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent)
@@ -113,14 +112,7 @@ fn schedule_copies<
         #[cfg(unix)]
         if from_metadata.is_dir() {
             use std::os::unix::fs::{DirBuilderExt, MetadataExt};
-            match fs::DirBuilder::new()
-                .mode(
-                    fs::symlink_metadata(&from)
-                        .map_io_err(|| format!("Failed to stat directory: {from:?}"))?
-                        .mode(),
-                )
-                .create(&to)
-            {
+            match fs::DirBuilder::new().mode(from_metadata.mode()).create(&to) {
                 Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {}
                 r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
             };
@@ -185,13 +177,13 @@ mod compat {
     }
 
     pub fn copy_impl<'a, 'b>(
-        dereference: bool,
+        follow_symlinks: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
         let scheduling = LazyCell::new(move || {
             let (tx, rx) = crossbeam_channel::unbounded();
             (
                 tx,
-                thread::spawn(move || root_worker_thread(rx, dereference)),
+                thread::spawn(move || root_worker_thread(rx, follow_symlinks)),
             )
         });
 
@@ -226,7 +218,7 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn root_worker_thread(tasks: Receiver<TreeNode>, dereference: bool) -> Result<(), Error> {
+    fn root_worker_thread(tasks: Receiver<TreeNode>, follow_symlinks: bool) -> Result<(), Error> {
         let mut available_parallelism = thread::available_parallelism()
             .map(NonZeroUsize::get)
             .unwrap_or(1)
@@ -268,7 +260,7 @@ mod compat {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                move || worker_thread(tasks, root_to_inode, dereference)
+                                move || worker_thread(tasks, root_to_inode, follow_symlinks)
                             }));
                         }
                     };
@@ -277,7 +269,7 @@ mod compat {
                     copy_dir(
                         node,
                         root_to_inode,
-                        dereference,
+                        follow_symlinks,
                         &mut buf,
                         &symlink_buf_cache,
                         maybe_spawn,
@@ -296,7 +288,7 @@ mod compat {
     fn worker_thread(
         tasks: Receiver<TreeNode>,
         root_to_inode: u64,
-        dereference: bool,
+        follow_symlinks: bool,
     ) -> Result<(), Error> {
         unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
 
@@ -306,7 +298,7 @@ mod compat {
             copy_dir(
                 node,
                 root_to_inode,
-                dereference,
+                follow_symlinks,
                 &mut buf,
                 &symlink_buf_cache,
                 || {},
@@ -322,7 +314,7 @@ mod compat {
     fn copy_dir(
         TreeNode { from, to, messages }: TreeNode,
         root_to_inode: u64,
-        dereference: bool,
+        follow_symlinks: bool,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
         mut maybe_spawn: impl FnMut(),
@@ -332,7 +324,7 @@ mod compat {
             &from,
             OFlags::RDONLY
                 | OFlags::DIRECTORY
-                | if dereference {
+                | if follow_symlinks {
                     OFlags::empty()
                 } else {
                     OFlags::NOFOLLOW
@@ -363,8 +355,9 @@ mod compat {
             }
 
             let mut file_type = file.file_type();
-            if file_type == FileType::Unknown || (dereference && file_type == FileType::Symlink) {
-                file_type = get_file_type(&from_dir, file.file_name(), &from, dereference)?;
+            if file_type == FileType::Unknown || (follow_symlinks && file_type == FileType::Symlink)
+            {
+                file_type = get_file_type(&from_dir, file.file_name(), &from, follow_symlinks)?;
             }
             let file_type = file_type;
             if file_type == FileType::Directory {
@@ -609,17 +602,14 @@ mod compat {
     };
 
     struct Impl {
-        #[cfg(unix)]
-        dereference: bool,
+        #[allow(dead_code)]
+        follow_symlinks: bool,
     }
 
     pub fn copy_impl<'a, 'b>(
-        #[cfg(unix)] dereference: bool,
+        follow_symlinks: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        Impl {
-            #[cfg(unix)]
-            dereference,
-        }
+        Impl { follow_symlinks }
     }
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
@@ -628,7 +618,7 @@ mod compat {
                 &from,
                 to,
                 #[cfg(unix)]
-                self.dereference,
+                self.follow_symlinks,
                 #[cfg(unix)]
                 None,
             )
@@ -643,7 +633,7 @@ mod compat {
     fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(
         from: P,
         to: Q,
-        #[cfg(unix)] dereference: bool,
+        #[cfg(unix)] follow_symlinks: bool,
         #[cfg(unix)] root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
@@ -673,7 +663,7 @@ mod compat {
                     #[cfg(unix)]
                     {
                         let mut file_type = dir_entry.file_type()?;
-                        if dereference && file_type.is_symlink() {
+                        if follow_symlinks && file_type.is_symlink() {
                             file_type = fs::metadata(dir_entry.path())?.file_type();
                         }
                         file_type
@@ -686,7 +676,7 @@ mod compat {
 
                 #[cfg(unix)]
                 if file_type.is_dir() {
-                    copy_dir(dir_entry.path(), to, dereference, root_to_inode)?;
+                    copy_dir(dir_entry.path(), to, follow_symlinks, root_to_inode)?;
                 } else if file_type.is_symlink() {
                     std::os::unix::fs::symlink(fs::read_link(dir_entry.path())?, to)?;
                 } else {

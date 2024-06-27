@@ -43,8 +43,10 @@ struct Cpz {
     #[arg(short = 't', long, default_value_t = false)]
     reverse_args: bool,
 
-    /// always follow symbolic links in source
+    /// Follow symlinks in the files to be copied rather than copying the
+    /// symlinks themselves
     #[arg(short = 'L', long, default_value_t = false)]
+    #[arg(aliases = ["follow-symlinks"])]
     dereference: bool,
 
     #[arg(short, long, short_alias = '?', global = true)]
@@ -248,7 +250,7 @@ fn copy(
                 (path, to)
             }))
             .force(force)
-            .dereference(dereference)
+            .follow_symlinks(dereference)
             .build()
             .run()
     } else {
@@ -267,7 +269,7 @@ fn copy(
                 (from, to)
             }])
             .force(force)
-            .dereference(dereference)
+            .follow_symlinks(dereference)
             .build()
             .run()
     }

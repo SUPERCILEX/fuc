@@ -81,7 +81,7 @@ Options:
           Reverse the argument order so that it becomes `cpz <TO> <FROM>...`
 
   -L, --dereference
-          always follow symbolic links in source
+          Follow symlinks in the files to be copied rather than copying the symlinks themselves
 
   -h, --help
           Print help (use `-h` for a summary)
