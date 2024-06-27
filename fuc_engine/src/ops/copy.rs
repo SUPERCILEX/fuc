@@ -659,20 +659,13 @@ mod compat {
                 }
 
                 let to = to.join(dir_entry.file_name());
-                let file_type = {
-                    #[cfg(unix)]
-                    {
-                        let mut file_type = dir_entry.file_type()?;
-                        if follow_symlinks && file_type.is_symlink() {
-                            file_type = fs::metadata(dir_entry.path())?.file_type();
-                        }
-                        file_type
-                    }
-                    #[cfg(not(unix))]
-                    {
-                        dir_entry.file_type()?
-                    }
-                };
+                #[allow(unused_mut)]
+                let mut file_type = dir_entry.file_type()?;
+                #[cfg(unix)]
+                if follow_symlinks && file_type.is_symlink() {
+                    file_type = fs::metadata(dir_entry.path())?.file_type();
+                }
+                let file_type = file_type;
 
                 #[cfg(unix)]
                 if file_type.is_dir() {
