@@ -320,7 +320,9 @@ mod compat {
             }
 
             let file_type = match file.file_type() {
-                FileType::Unknown => get_file_type(&dir, file.file_name(), &node.as_ref().path)?,
+                FileType::Unknown => {
+                    get_file_type(&dir, file.file_name(), &node.as_ref().path, false)?
+                }
                 t => t,
             };
             if file_type == FileType::Directory {

@@ -81,8 +81,14 @@ mod linux {
         dir: impl AsFd,
         file_name: &CStr,
         path: &CString,
+        follow_symlinks: bool,
     ) -> Result<FileType, Error> {
-        statx(dir, file_name, AtFlags::SYMLINK_NOFOLLOW, StatxFlags::TYPE)
+        let flags = if follow_symlinks {
+            AtFlags::empty()
+        } else {
+            AtFlags::SYMLINK_NOFOLLOW
+        };
+        statx(dir, file_name, flags, StatxFlags::TYPE)
             .map_io_err(|| {
                 format!(
                     "Failed to stat file: {:?}",
