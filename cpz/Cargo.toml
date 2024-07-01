@@ -10,7 +10,7 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.7", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.8", features = ["derive", "wrap_help"] }
 error-stack = "0.4.1"
 fuc_engine = { version = "1", path = "../fuc_engine" }
 indicatif = { version = "0.17.8", optional = true }
@@ -26,7 +26,7 @@ cache-size = "0.7.0"
 criterion = "0.5.1"
 memmap2 = "0.9.4"
 rand = "0.8.5"
-supercilex-tests = { version = "0.4.5", default-features = false, features = ["clap"] }
+supercilex-tests = { version = "0.4.6", default-features = false, features = ["clap"] }
 tempfile = "3.10.1"
 trycmd = "0.15.4"
 
