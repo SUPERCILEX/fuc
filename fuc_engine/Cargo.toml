@@ -11,9 +11,9 @@ license.workspace = true
 
 [dependencies]
 crossbeam-channel = "0.5.13"
-thiserror = "1.0.61"
+thiserror = "1.0.62"
 tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
-typed-builder = "0.18.2"
+typed-builder = "0.19.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "0.38.34", features = ["fs", "thread", "linux_latest"] }
