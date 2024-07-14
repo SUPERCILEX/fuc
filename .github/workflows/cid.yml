@@ -24,6 +24,8 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
       - name: Build project
         run: cargo build --workspace --release
+      - name: Build project with all features
+        run: cargo build --workspace --all-features
 
   test:
     strategy:
