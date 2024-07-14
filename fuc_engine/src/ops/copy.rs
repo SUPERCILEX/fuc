@@ -612,7 +612,6 @@ mod compat {
     };
 
     struct Impl {
-        #[allow(dead_code)]
         follow_symlinks: bool,
     }
 
@@ -625,15 +624,8 @@ mod compat {
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
-            copy_dir(
-                &from,
-                to,
-                #[cfg(unix)]
-                self.follow_symlinks,
-                #[cfg(unix)]
-                None,
-            )
-            .map_io_err(|| format!("Failed to copy directory: {from:?}"))
+            copy_dir(&from, to, self.follow_symlinks, None)
+                .map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
@@ -646,8 +638,8 @@ mod compat {
     fn copy_dir<P: AsRef<Path> + Debug, Q: AsRef<Path> + Debug>(
         from: P,
         to: Q,
-        #[cfg(unix)] follow_symlinks: bool,
-        #[cfg(unix)] root_to_inode: Option<u64>,
+        follow_symlinks: bool,
+        root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
         match fs::create_dir(to) {
@@ -691,7 +683,8 @@ mod compat {
 
                 #[cfg(not(unix))]
                 if file_type.is_dir() {
-                    copy_dir(dir_entry.path(), to)?;
+                    let (_, _) = (follow_symlinks, root_to_inode);
+                    copy_dir(dir_entry.path(), to, follow_symlinks, root_to_inode)?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }
