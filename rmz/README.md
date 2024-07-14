@@ -20,6 +20,15 @@ $ cargo install rmz
 > To install cargo, follow
 > [these instructions](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
+### Build with a progress indicator
+
+By default, no progress is shown to maximize performance—if a visual indicator of activity is
+preferred, the binary can be installed with the progress feature.
+
+```console,ignore
+$ cargo install rmz --features progress
+```
+
 ## Usage
 
 Background: https://github.com/SUPERCILEX/fuc/blob/master/README.md
