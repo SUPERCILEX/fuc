@@ -602,7 +602,7 @@ mod compat {
 
 #[cfg(not(target_os = "linux"))]
 mod compat {
-    use std::{borrow::Cow, fs, io, path::Path};
+    use std::{borrow::Cow, fmt::Debug, fs, io, path::Path};
 
     use rayon::prelude::*;
 
@@ -623,6 +623,7 @@ mod compat {
     }
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
             copy_dir(
                 &from,
@@ -635,12 +636,14 @@ mod compat {
             .map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
             Ok(())
         }
     }
 
-    fn copy_dir<P: AsRef<Path>, Q: AsRef<Path>>(
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "info"))]
+    fn copy_dir<P: AsRef<Path> + Debug, Q: AsRef<Path> + Debug>(
         from: P,
         to: Q,
         #[cfg(unix)] follow_symlinks: bool,
@@ -698,7 +701,8 @@ mod compat {
     }
 
     #[cfg(unix)]
-    fn maybe_compute_root_to_inode<P: AsRef<Path>>(
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+    fn maybe_compute_root_to_inode<P: AsRef<Path> + Debug>(
         to: P,
         root_to_inode: Option<u64>,
     ) -> Result<u64, io::Error> {

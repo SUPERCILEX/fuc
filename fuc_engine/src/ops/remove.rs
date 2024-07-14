@@ -434,7 +434,7 @@ mod compat {
 
 #[cfg(all(not(target_os = "linux"), not(target_os = "windows")))]
 mod compat {
-    use std::{borrow::Cow, fs, io, path::Path};
+    use std::{borrow::Cow, fmt::Debug, fs, io, path::Path};
 
     use rayon::prelude::*;
 
@@ -450,16 +450,19 @@ mod compat {
     }
 
     impl DirectoryOp<Cow<'_, Path>> for Impl {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
             remove_dir_all(&dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))
         }
 
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
             Ok(())
         }
     }
 
-    fn remove_dir_all<P: AsRef<Path>>(path: P) -> Result<(), io::Error> {
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "info"))]
+    fn remove_dir_all<P: AsRef<Path> + Debug>(path: P) -> Result<(), io::Error> {
         let path = path.as_ref();
         path.read_dir()?
             .par_bridge()
@@ -494,10 +497,12 @@ mod compat {
     }
 
     impl DirectoryOp<Cow<'_, Path>> for Impl {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
             remove_dir_all(&dir).map_io_err(|| format!("Failed to delete directory: {dir:?}"))
         }
 
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
             Ok(())
         }
