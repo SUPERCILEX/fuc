@@ -116,7 +116,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/${{ matrix.target }}/release/rmz
-          asset_name: rmz-${{ matrix.target }}
+          asset_name: ${{ matrix.target }}-rmz
           tag: ${{ github.ref }}
       - name: Upload binary
         if: matrix.os != 'windows-latest'
@@ -124,7 +124,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/${{ matrix.target }}/release/cpz
-          asset_name: cpz-${{ matrix.target }}
+          asset_name: ${{ matrix.target }}-cpz
           tag: ${{ github.ref }}
       - name: Upload binary
         if: matrix.os == 'windows-latest'
@@ -132,7 +132,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/${{ matrix.target }}/release/rmz.exe
-          asset_name: rmz-${{ matrix.target }}.exe
+          asset_name: ${{ matrix.target }}-rmz.exe
           tag: ${{ github.ref }}
       - name: Upload binary
         if: matrix.os == 'windows-latest'
@@ -140,5 +140,5 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/${{ matrix.target }}/release/cpz.exe
-          asset_name: cpz-${{ matrix.target }}.exe
+          asset_name: ${{ matrix.target }}-cpz.exe
           tag: ${{ github.ref }}
