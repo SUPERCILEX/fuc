@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
 
-use typed_builder::TypedBuilder;
+use bon::builder;
 
 use crate::{
     ops::{compat::DirectoryOp, IoErr},
@@ -19,7 +19,8 @@ pub fn copy_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), E
         .run()
 }
 
-#[derive(TypedBuilder, Debug)]
+#[derive(Debug)]
+#[builder]
 pub struct CopyOp<
     'a,
     'b,

@@ -7,7 +7,7 @@ use std::{
     path::{Path, MAIN_SEPARATOR_STR},
 };
 
-use typed_builder::TypedBuilder;
+use bon::builder;
 
 use crate::{
     ops::{compat::DirectoryOp, IoErr},
@@ -29,7 +29,8 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), Error> {
         .run()
 }
 
-#[derive(TypedBuilder, Debug)]
+#[derive(Debug)]
+#[builder]
 pub struct RemoveOp<'a, I: Into<Cow<'a, Path>> + 'a, F: IntoIterator<Item = I>> {
     files: F,
     #[builder(default = false)]
