@@ -11,7 +11,7 @@ license.workspace = true
 
 [dependencies]
 crossbeam-channel = "0.5.13"
-thiserror = "1.0.62"
+thiserror = "1.0.63"
 tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
 typed-builder = "0.19.1"
 
@@ -22,11 +22,11 @@ rustix = { version = "0.38.34", features = ["fs", "thread", "linux_latest"] }
 rayon = "1.10.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-remove_dir_all = { version = "0.8.2", features = ["parallel"] }
+remove_dir_all = { version = "0.8.3", features = ["parallel"] }
 
 [dev-dependencies]
 ftzz = "3.0.0"
 io-adapters = "0.3.0"
-rstest = { version = "0.21.0", default-features = false }
-supercilex-tests = { version = "0.4.6", default-features = false, features = ["api"] }
-tempfile = "3.10.1"
+rstest = { version = "0.22.0", default-features = false }
+supercilex-tests = { version = "0.4.8", default-features = false, features = ["api"] }
+tempfile = "3.11.0"

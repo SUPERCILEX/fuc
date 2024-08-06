@@ -5,4 +5,4 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-remove_dir_all = { version = "0.8.2", features = ["parallel"] }
+remove_dir_all = { version = "0.8.3", features = ["parallel"] }

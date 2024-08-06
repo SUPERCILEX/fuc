@@ -230,7 +230,6 @@ fn just_writes(c: &mut Criterion) {
     }
 }
 
-#[allow(clippy::too_many_lines)]
 fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: bool) {
     group.bench_with_input(
         BenchmarkId::new("fs::copy", num_bytes),

@@ -1,5 +1,4 @@
 #![feature(lazy_cell_into_inner)]
-#![allow(clippy::used_underscore_binding)]
 #![allow(clippy::needless_pass_by_value)]
 
 use std::{borrow::Cow, io, path::PathBuf};

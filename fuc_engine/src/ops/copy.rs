@@ -173,7 +173,6 @@ mod compat {
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
-        #[allow(clippy::type_complexity)]
         scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
     }
 
