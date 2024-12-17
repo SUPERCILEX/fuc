@@ -3,8 +3,8 @@ use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
 use bon::builder;
 
 use crate::{
-    ops::{compat::DirectoryOp, IoErr},
     Error,
+    ops::{IoErr, compat::DirectoryOp},
 };
 
 /// Copies a file or directory at this path.
@@ -158,19 +158,19 @@ mod compat {
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
         fs::{
-            copy_file_range, mkdirat, openat, readlinkat, statx, symlinkat, AtFlags, FileType,
-            Mode, OFlags, RawDir, StatxFlags, CWD,
+            AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, mkdirat,
+            openat, readlinkat, statx, symlinkat,
         },
         io::Errno,
-        thread::{unshare, UnshareFlags},
+        thread::{UnshareFlags, unshare},
     };
 
     use crate::{
-        ops::{
-            compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
-            IoErr,
-        },
         Error,
+        ops::{
+            IoErr, compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths,
+            path_buf_to_cstring,
+        },
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
@@ -607,8 +607,8 @@ mod compat {
     use rayon::prelude::*;
 
     use crate::{
-        ops::{compat::DirectoryOp, IoErr},
         Error,
+        ops::{IoErr, compat::DirectoryOp},
     };
 
     struct Impl {

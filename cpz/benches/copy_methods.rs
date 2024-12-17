@@ -1,7 +1,7 @@
 use std::{
     alloc,
     alloc::Layout,
-    fs::{copy, File, OpenOptions},
+    fs::{File, OpenOptions, copy},
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
     time::Duration,
@@ -9,12 +9,12 @@ use std::{
 
 use cache_size::l1_cache_size;
 use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, AxisScale, BatchSize, BenchmarkGroup,
-    BenchmarkId, Criterion, PlotConfiguration, Throughput,
+    AxisScale, BatchSize, BenchmarkGroup, BenchmarkId, Criterion, PlotConfiguration, Throughput,
+    criterion_group, criterion_main, measurement::WallTime,
 };
 use memmap2::{Mmap, MmapOptions};
-use rand::{thread_rng, RngCore};
-use tempfile::{tempdir, TempDir};
+use rand::{RngCore, thread_rng};
+use tempfile::{TempDir, tempdir};
 
 // Don't use an OS backed tempfile since it might change the performance
 // characteristics of our copy
@@ -102,7 +102,7 @@ fn empty_files(c: &mut Criterion) {
         b.iter_batched(
             || NormalTempFile::create(0, false),
             |files| {
-                use rustix::fs::{mknodat, FileType, Mode, CWD};
+                use rustix::fs::{CWD, FileType, Mode, mknodat};
 
                 mknodat(
                     CWD,
@@ -128,7 +128,7 @@ fn empty_files(c: &mut Criterion) {
                 (files, dir)
             },
             |(files, dir)| {
-                use rustix::fs::{mknodat, FileType, Mode};
+                use rustix::fs::{FileType, Mode, mknodat};
 
                 mknodat(
                     &dir,
@@ -150,7 +150,7 @@ fn empty_files(c: &mut Criterion) {
         let files = NormalTempFile::create(0, false);
         let path = files.to.as_path();
         b.iter(|| {
-            use rustix::fs::{openat, Mode, OFlags, CWD};
+            use rustix::fs::{CWD, Mode, OFlags, openat};
 
             openat(CWD, path, OFlags::CREATE, Mode::RWXU).unwrap()
         });
@@ -162,7 +162,7 @@ fn empty_files(c: &mut Criterion) {
         let dir = File::open(files.dir.path()).unwrap();
         let path = files.to.file_name().unwrap();
         b.iter(|| {
-            use rustix::fs::{openat, Mode, OFlags};
+            use rustix::fs::{Mode, OFlags, openat};
 
             openat(&dir, path, OFlags::CREATE, Mode::RWXU).unwrap()
         });
@@ -561,7 +561,7 @@ fn write_from_buffer(to: PathBuf, mut reader: BufReader<File>) {
 
 #[cfg(target_os = "linux")]
 fn allocate(file: &File, len: u64) {
-    use rustix::fs::{fallocate, FallocateFlags};
+    use rustix::fs::{FallocateFlags, fallocate};
     fallocate(file, FallocateFlags::empty(), 0, len).unwrap();
 }
 

@@ -1,9 +1,9 @@
 use std::{borrow::Cow, io};
 
-pub use copy::{copy_file, CopyOp};
+pub use copy::{CopyOp, copy_file};
 #[cfg(target_os = "linux")]
 use linux::{concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring};
-pub use remove::{remove_file, RemoveOp};
+pub use remove::{RemoveOp, remove_file};
 
 use crate::Error;
 
@@ -36,12 +36,12 @@ mod linux {
             ffi::{OsStrExt, OsStringExt},
             io::AsFd,
         },
-        path::{Path, PathBuf, MAIN_SEPARATOR},
+        path::{MAIN_SEPARATOR, Path, PathBuf},
     };
 
-    use rustix::fs::{statx, AtFlags, FileType, StatxFlags};
+    use rustix::fs::{AtFlags, FileType, StatxFlags, statx};
 
-    use crate::{ops::IoErr, Error};
+    use crate::{Error, ops::IoErr};
 
     impl<T> IoErr<Result<T, Error>> for Result<T, rustix::io::Errno> {
         fn map_io_err<I: Into<Cow<'static, str>>>(

@@ -47,8 +47,8 @@ static GLOBAL: tracy_client::ProfiledAllocator<std::alloc::System> =
 #[cfg(feature = "trace")]
 fn init_trace() {
     use tracing_subscriber::{
-        filter::LevelFilter, fmt::format::DefaultFields, layer::SubscriberExt,
-        util::SubscriberInitExt, EnvFilter,
+        EnvFilter, filter::LevelFilter, fmt::format::DefaultFields, layer::SubscriberExt,
+        util::SubscriberInitExt,
     };
 
     #[derive(Default)]
@@ -87,7 +87,7 @@ fn init_progress() {
     use indicatif::{ProgressState, ProgressStyle};
     use tracing::level_filters::LevelFilter;
     use tracing_indicatif::IndicatifLayer;
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
     let indicatif_layer = IndicatifLayer::new()
         .with_progress_style(

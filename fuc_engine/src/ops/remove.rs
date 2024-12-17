@@ -4,14 +4,14 @@ use std::{
     fmt::Debug,
     fs, io,
     marker::PhantomData,
-    path::{Path, MAIN_SEPARATOR_STR},
+    path::{MAIN_SEPARATOR_STR, Path},
 };
 
 use bon::builder;
 
 use crate::{
-    ops::{compat::DirectoryOp, IoErr},
     Error,
+    ops::{IoErr, compat::DirectoryOp},
 };
 
 /// Removes a file or directory at this path, after removing all its contents.
@@ -137,16 +137,16 @@ mod compat {
 
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
-        fs::{openat, unlinkat, AtFlags, FileType, Mode, OFlags, RawDir, CWD},
-        thread::{unshare, UnshareFlags},
+        fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
+        thread::{UnshareFlags, unshare},
     };
 
     use crate::{
-        ops::{
-            compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring,
-            IoErr,
-        },
         Error,
+        ops::{
+            IoErr, compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths,
+            path_buf_to_cstring,
+        },
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
@@ -439,8 +439,8 @@ mod compat {
     use rayon::prelude::*;
 
     use crate::{
-        ops::{compat::DirectoryOp, IoErr},
         Error,
+        ops::{IoErr, compat::DirectoryOp},
     };
 
     struct Impl;
@@ -486,8 +486,8 @@ mod compat {
     use remove_dir_all::remove_dir_all;
 
     use crate::{
-        ops::{compat::DirectoryOp, IoErr},
         Error,
+        ops::{IoErr, compat::DirectoryOp},
     };
 
     struct Impl;
