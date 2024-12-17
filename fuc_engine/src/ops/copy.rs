@@ -350,6 +350,7 @@ mod compat {
         )
         .map_io_err(|| format!("Failed to open directory: {to:?}"))?;
 
+        let mut failed_cross_device = false;
         let mut raw_dir = RawDir::new(&from_dir, buf);
         while let Some(file) = raw_dir.next() {
             let file = file.map_io_err(|| format!("Failed to read directory: {from:?}"))?;
@@ -392,6 +393,7 @@ mod compat {
                     &from,
                     &to,
                     symlink_buf_cache,
+                    &mut failed_cross_device,
                 )?;
             }
         }
@@ -432,6 +434,7 @@ mod compat {
         from_path: &CString,
         to_path: &CString,
         symlink_buf_cache: &Cell<Vec<u8>>,
+        failed_cross_device: &mut bool,
     ) -> Result<(), Error> {
         if file_type == FileType::Symlink {
             copy_symlink(
@@ -444,8 +447,8 @@ mod compat {
             )
         } else {
             let (from, to) = prep_regular_file(from_dir, to_dir, file_name, from_path, to_path)?;
-            if file_type == FileType::RegularFile {
-                copy_regular_file(from, to, file_name, from_path)
+            if file_type == FileType::RegularFile && !*failed_cross_device {
+                copy_regular_file(from, to, file_name, from_path, failed_cross_device)
             } else {
                 copy_any_file(from, to, file_name, from_path)
             }
@@ -461,12 +464,14 @@ mod compat {
         to: OwnedFd,
         file_name: &CStr,
         from_path: &CString,
+        failed_cross_device: &mut bool,
     ) -> Result<(), Error> {
         let mut total_copied = 0;
         loop {
             let byte_copied =
                 match copy_file_range(&from, None, &to, None, usize::MAX / 2 - total_copied) {
                     Err(Errno::XDEV) if total_copied == 0 => {
+                        *failed_cross_device = true;
                         return copy_any_file(from, to, file_name, from_path);
                     }
                     r => r.map_io_err(|| {
