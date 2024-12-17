@@ -446,9 +446,17 @@ mod compat {
                 symlink_buf_cache,
             )
         } else {
-            let (from, to) = prep_regular_file(from_dir, to_dir, file_name, from_path, to_path)?;
+            let (from, to, from_size) =
+                prep_regular_file(from_dir, to_dir, file_name, from_path, to_path)?;
             if file_type == FileType::RegularFile && !*failed_cross_device {
-                copy_regular_file(from, to, file_name, from_path, failed_cross_device)
+                copy_regular_file(
+                    from,
+                    to,
+                    file_name,
+                    from_path,
+                    from_size,
+                    failed_cross_device,
+                )
             } else {
                 copy_any_file(from, to, file_name, from_path)
             }
@@ -464,6 +472,7 @@ mod compat {
         to: OwnedFd,
         file_name: &CStr,
         from_path: &CString,
+        from_size: u64,
         failed_cross_device: &mut bool,
     ) -> Result<(), Error> {
         let mut total_copied = 0;
@@ -481,11 +490,11 @@ mod compat {
                         )
                     })?,
                 };
+            total_copied += byte_copied;
 
-            if byte_copied == 0 {
+            if u64::try_from(total_copied).unwrap() == from_size || byte_copied == 0 {
                 return Ok(());
             }
-            total_copied += byte_copied;
         }
     }
 
@@ -520,7 +529,7 @@ mod compat {
         file_name: &CStr,
         from_path: &CString,
         to_path: &CString,
-    ) -> Result<(OwnedFd, OwnedFd), Error> {
+    ) -> Result<(OwnedFd, OwnedFd, u64), Error> {
         let from =
             openat(&from_dir, file_name, OFlags::RDONLY, Mode::empty()).map_io_err(|| {
                 format!(
@@ -529,15 +538,22 @@ mod compat {
                 )
             })?;
 
+        let from_size;
         let to = {
             let from_mode = {
-                let from_metadata = statx(from_dir, file_name, AtFlags::empty(), StatxFlags::MODE)
-                    .map_io_err(|| {
-                        format!(
-                            "Failed to stat file: {:?}",
-                            join_cstr_paths(from_path, file_name)
-                        )
-                    })?;
+                let from_metadata = statx(
+                    from_dir,
+                    file_name,
+                    AtFlags::empty(),
+                    StatxFlags::MODE | StatxFlags::SIZE,
+                )
+                .map_io_err(|| {
+                    format!(
+                        "Failed to stat file: {:?}",
+                        join_cstr_paths(from_path, file_name)
+                    )
+                })?;
+                from_size = from_metadata.stx_size;
                 Mode::from_raw_mode(from_metadata.stx_mode.into())
             };
             openat(
@@ -554,7 +570,7 @@ mod compat {
             })?
         };
 
-        Ok((from, to))
+        Ok((from, to, from_size))
     }
 
     #[cold]
