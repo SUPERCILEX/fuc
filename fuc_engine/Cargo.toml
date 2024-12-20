@@ -10,23 +10,23 @@ categories = ["filesystem"]
 license.workspace = true
 
 [dependencies]
-bon = "1.0.6"
-crossbeam-channel = "0.5.13"
-thiserror = "1.0.63"
-tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
+bon = "3.3.0"
+crossbeam-channel = "0.5.14"
+thiserror = "2.0.8"
+tracing = { version = "0.1.41", default-features = false, features = ["attributes"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.38.34", features = ["fs", "thread", "linux_latest"] }
+rustix = { version = "0.38.42", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 rayon = "1.10.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-remove_dir_all = { version = "0.8.3", features = ["parallel"] }
+remove_dir_all = { version = "1.0.0", features = ["parallel"] }
 
 [dev-dependencies]
 ftzz = "3.0.0"
-io-adapters = "0.3.0"
-rstest = { version = "0.22.0", default-features = false }
-supercilex-tests = { version = "0.4.8", default-features = false, features = ["api"] }
-tempfile = "3.11.0"
+io-adapters = "0.4.0"
+rstest = { version = "0.23.0", default-features = false }
+supercilex-tests = { version = "0.4.12", default-features = false, features = ["api"] }
+tempfile = "3.14.0"

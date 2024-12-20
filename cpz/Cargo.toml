@@ -10,28 +10,28 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.13", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.23", features = ["derive", "wrap_help"] }
 error-stack = { version = "0.5.0", default-features = false, features = ["std"] }
 fuc_engine = { version = "1", path = "../fuc_engine" }
-indicatif = { version = "0.17.8", optional = true }
-thiserror = "1.0.63"
-tracing = { version = "0.1.40", optional = true }
-tracing-indicatif = { version = "0.3.6", optional = true }
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"], optional = true }
-tracing-tracy = { version = "0.11.1", features = ["flush-on-exit"], optional = true }
-tracy-client = { version = "0.17.1", optional = true }
+indicatif = { version = "0.17.9", optional = true }
+thiserror = "2.0.8"
+tracing = { version = "0.1.41", optional = true }
+tracing-indicatif = { version = "0.3.8", optional = true }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"], optional = true }
+tracing-tracy = { version = "0.11.3", features = ["flush-on-exit"], optional = true }
+tracy-client = { version = "0.17.6", optional = true }
 
 [dev-dependencies]
 cache-size = "0.7.0"
 criterion = "0.5.1"
-memmap2 = "0.9.4"
+memmap2 = "0.9.5"
 rand = "0.8.5"
-supercilex-tests = { version = "0.4.8", default-features = false, features = ["clap"] }
-tempfile = "3.11.0"
-trycmd = "0.15.6"
+supercilex-tests = { version = "0.4.12", default-features = false, features = ["clap"] }
+tempfile = "3.14.0"
+trycmd = "0.15.8"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "0.38.34", features = ["fs", "pipe"] }
+rustix = { version = "0.38.42", features = ["fs", "pipe"] }
 
 [features]
 trace = ["fuc_engine/tracing", "dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy", "dep:tracy-client"]

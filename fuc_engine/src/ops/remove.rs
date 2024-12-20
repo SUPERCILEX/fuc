@@ -7,7 +7,7 @@ use std::{
     path::{MAIN_SEPARATOR_STR, Path},
 };
 
-use bon::builder;
+use bon::Builder;
 
 use crate::{
     Error,
@@ -29,15 +29,14 @@ pub fn remove_file<P: AsRef<Path>>(path: P) -> Result<(), Error> {
         .run()
 }
 
-#[derive(Debug)]
-#[builder]
+#[derive(Debug, Builder)]
 pub struct RemoveOp<'a, I: Into<Cow<'a, Path>> + 'a, F: IntoIterator<Item = I>> {
     files: F,
     #[builder(default = false)]
     force: bool,
     #[builder(default = true)]
     preserve_root: bool,
-    #[builder(default)]
+    #[builder(skip)]
     _marker: PhantomData<&'a I>,
 }
 

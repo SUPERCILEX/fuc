@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
 
-use bon::builder;
+use bon::Builder;
 
 use crate::{
     Error,
@@ -19,8 +19,7 @@ pub fn copy_file<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<(), E
         .run()
 }
 
-#[derive(Debug)]
-#[builder]
+#[derive(Debug, Builder)]
 pub struct CopyOp<
     'a,
     'b,
@@ -33,9 +32,9 @@ pub struct CopyOp<
     force: bool,
     #[builder(default = false)]
     follow_symlinks: bool,
-    #[builder(default)]
+    #[builder(skip)]
     _marker1: PhantomData<&'a I1>,
-    #[builder(default)]
+    #[builder(skip)]
     _marker2: PhantomData<&'b I2>,
 }
 
