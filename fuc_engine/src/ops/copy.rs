@@ -104,11 +104,6 @@ fn schedule_copies<
         }
         .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
 
-        if let Some(parent) = to.parent() {
-            fs::create_dir_all(parent)
-                .map_io_err(|| format!("Failed to create parent directory: {parent:?}"))?;
-        }
-
         #[cfg(unix)]
         if from_metadata.is_dir() {
             use std::os::unix::fs::{DirBuilderExt, MetadataExt};

@@ -234,8 +234,12 @@ fn copy(
                 | (Some('.'), Some('.'), Some(MAIN_SEPARATOR)) // */..
         )
     });
-    if from.len() > 1 || *is_into_directory {
-        fs::create_dir_all(&to).map_err(|error| Error::Io {
+    if let Some(dir) = if from.len() > 1 || *is_into_directory {
+        Some(&*to)
+    } else {
+        to.parent()
+    } {
+        fs::create_dir_all(dir).map_err(|error| Error::Io {
             error,
             context: format!("Failed to create directory {to:?}").into(),
         })?;

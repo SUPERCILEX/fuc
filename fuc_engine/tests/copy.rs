@@ -89,9 +89,9 @@ fn non_existent_parent_dir() {
         .force(true)
         .build()
         .run()
-        .unwrap();
+        .unwrap_err();
 
-    assert!(to.exists());
+    assert!(!to.exists());
 }
 
 #[test]
