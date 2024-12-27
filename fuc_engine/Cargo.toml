@@ -10,9 +10,9 @@ categories = ["filesystem"]
 license.workspace = true
 
 [dependencies]
-bon = "3.3.0"
+bon = "3.3.1"
 crossbeam-channel = "0.5.14"
-thiserror = "2.0.8"
+thiserror = "2.0.9"
 tracing = { version = "0.1.41", default-features = false, features = ["attributes"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -28,5 +28,5 @@ remove_dir_all = { version = "1.0.0", features = ["parallel"] }
 ftzz = "3.0.0"
 io-adapters = "0.4.0"
 rstest = { version = "0.23.0", default-features = false }
-supercilex-tests = { version = "0.4.12", default-features = false, features = ["api"] }
+supercilex-tests = { version = "0.4.13", default-features = false, features = ["api"] }
 tempfile = "3.14.0"
