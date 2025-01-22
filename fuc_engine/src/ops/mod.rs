@@ -2,7 +2,7 @@ use std::{borrow::Cow, io};
 
 pub use copy::{CopyOp, copy_file};
 #[cfg(target_os = "linux")]
-use linux::{concat_cstrs, get_file_type, join_cstr_paths, path_buf_to_cstring};
+use linux::{concat_cstrs, join_cstr_paths, path_buf_to_cstring};
 pub use remove::{RemoveOp, remove_file};
 
 use crate::Error;
@@ -32,14 +32,9 @@ mod linux {
         borrow::Cow,
         ffi::{CStr, CString, OsStr, OsString},
         io,
-        os::unix::{
-            ffi::{OsStrExt, OsStringExt},
-            io::AsFd,
-        },
+        os::unix::ffi::{OsStrExt, OsStringExt},
         path::{MAIN_SEPARATOR, Path, PathBuf},
     };
-
-    use rustix::fs::{AtFlags, FileType, StatxFlags, statx};
 
     use crate::{Error, ops::IoErr};
 
@@ -73,29 +68,6 @@ mod linux {
     pub fn join_cstr_paths(path: &CString, name: &CStr) -> PathBuf {
         Path::new(OsStr::from_bytes(path.as_bytes()))
             .join(Path::new(OsStr::from_bytes(name.to_bytes())))
-    }
-
-    #[cold]
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(dir)))]
-    pub fn get_file_type(
-        dir: impl AsFd,
-        file_name: &CStr,
-        path: &CString,
-        follow_symlinks: bool,
-    ) -> Result<FileType, Error> {
-        let flags = if follow_symlinks {
-            AtFlags::empty()
-        } else {
-            AtFlags::SYMLINK_NOFOLLOW
-        };
-        statx(dir, file_name, flags, StatxFlags::TYPE)
-            .map_io_err(|| {
-                format!(
-                    "Failed to stat file: {:?}",
-                    join_cstr_paths(path, file_name)
-                )
-            })
-            .map(|metadata| FileType::from_raw_mode(metadata.stx_mode.into()))
     }
 }
 

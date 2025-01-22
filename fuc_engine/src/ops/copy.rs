@@ -161,10 +161,7 @@ mod compat {
 
     use crate::{
         Error,
-        ops::{
-            IoErr, compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths,
-            path_buf_to_cstring,
-        },
+        ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
@@ -309,6 +306,29 @@ mod compat {
             )?;
         }
         Ok(())
+    }
+
+    #[cold]
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(dir)))]
+    pub fn get_file_type(
+        dir: impl AsFd,
+        file_name: &CStr,
+        path: &CString,
+        follow_symlinks: bool,
+    ) -> Result<FileType, Error> {
+        let flags = if follow_symlinks {
+            AtFlags::empty()
+        } else {
+            AtFlags::SYMLINK_NOFOLLOW
+        };
+        statx(dir, file_name, flags, StatxFlags::TYPE)
+            .map_io_err(|| {
+                format!(
+                    "Failed to stat file: {:?}",
+                    join_cstr_paths(path, file_name)
+                )
+            })
+            .map(|metadata| FileType::from_raw_mode(metadata.stx_mode.into()))
     }
 
     #[cfg_attr(
