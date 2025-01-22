@@ -137,15 +137,13 @@ mod compat {
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
         fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
+        io::Errno,
         thread::{UnshareFlags, unshare},
     };
 
     use crate::{
         Error,
-        ops::{
-            IoErr, compat::DirectoryOp, concat_cstrs, get_file_type, join_cstr_paths,
-            path_buf_to_cstring,
-        },
+        ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
@@ -318,40 +316,47 @@ mod compat {
                 }
             }
 
-            let file_type = match file.file_type() {
-                FileType::Unknown => {
-                    get_file_type(&dir, file.file_name(), &node.as_ref().path, false)?
-                }
-                t => t,
-            };
-            if file_type == FileType::Directory {
-                if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes()
-                    > 4096
-                {
-                    long_path_fallback_deletion(&node.as_ref().path, file.file_name())?;
-                    continue;
-                }
-
-                maybe_spawn();
-
-                let node = match node {
-                    Arcable::Raw(raw) => {
-                        let arc = Arc::new(raw);
-                        node = Arcable::Arced(arc.clone());
-                        arc
+            if file.file_type() != FileType::Directory {
+                let file = file.file_name();
+                match delete_file(&dir, file) {
+                    Ok(()) => continue,
+                    Err(Errno::ISDIR) => (),
+                    Err(error) => {
+                        return Err(Error::Io {
+                            error: error.into(),
+                            context: format!(
+                                "Failed to delete file: {:?}",
+                                join_cstr_paths(&node.as_ref().path, file)
+                            )
+                            .into(),
+                        });
                     }
-                    Arcable::Arced(ref node) => node.clone(),
-                };
-                node.messages
-                    .send(TreeNode {
-                        path: concat_cstrs(&node.path, file.file_name()),
-                        parent: Some(node.clone()),
-                        messages: node.messages.clone(),
-                    })
-                    .map_err(|_| Error::Internal)?;
-            } else {
-                delete_file(node.as_ref(), &dir, file.file_name())?;
+                }
             }
+
+            if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes() > 4096
+            {
+                long_path_fallback_deletion(&node.as_ref().path, file.file_name())?;
+                continue;
+            }
+
+            maybe_spawn();
+
+            let node = match node {
+                Arcable::Raw(raw) => {
+                    let arc = Arc::new(raw);
+                    node = Arcable::Arced(arc.clone());
+                    arc
+                }
+                Arcable::Arced(ref node) => node.clone(),
+            };
+            node.messages
+                .send(TreeNode {
+                    path: concat_cstrs(&node.path, file.file_name()),
+                    parent: Some(node.clone()),
+                    messages: node.messages.clone(),
+                })
+                .map_err(|_| Error::Internal)?;
         }
 
         Ok(Arcable::into_inner(node))
@@ -376,13 +381,8 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug", skip(dir)))]
-    fn delete_file(node: &TreeNode, dir: impl AsFd, file: &CStr) -> Result<(), Error> {
-        unlinkat(&dir, file, AtFlags::empty()).map_io_err(|| {
-            format!(
-                "Failed to delete file: {:?}",
-                join_cstr_paths(&node.path, file)
-            )
-        })
+    fn delete_file(dir: impl AsFd, file: &CStr) -> rustix::io::Result<()> {
+        unlinkat(&dir, file, AtFlags::empty())
     }
 
     #[cold]
