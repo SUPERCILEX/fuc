@@ -4,7 +4,7 @@ const ORDER: &[&str] = &["1M_files", "100_000_files", "10_000_files", "10_files"
 
 fn main() {
     let mut v = Vec::new();
-    for entry in fs::read_dir(env::args_os().last().unwrap()).unwrap() {
+    for entry in fs::read_dir(env::args_os().next_back().unwrap()).unwrap() {
         let entry = entry.unwrap();
         if !entry.file_name().to_string_lossy().ends_with(".md") {
             continue;
