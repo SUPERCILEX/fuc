@@ -234,7 +234,7 @@ fn copy(
                 | (Some('.'), Some('.'), Some(MAIN_SEPARATOR)) // */..
         )
     });
-    if let Some(dir) = if from.len() > 1 || *is_into_directory {
+    if let Some(dir) = if from.len() > 1 || (*is_into_directory && from[0].file_name().is_some()) {
         Some(&*to)
     } else {
         to.parent()
