@@ -13,7 +13,7 @@ use criterion::{
     criterion_group, criterion_main, measurement::WallTime,
 };
 use memmap2::{Mmap, MmapOptions};
-use rand::{RngCore, thread_rng};
+use rand::{RngCore, rng};
 use tempfile::{TempDir, tempdir};
 
 // Don't use an OS backed tempfile since it might change the performance
@@ -584,7 +584,7 @@ fn create_random_buffer(bytes: usize, direct_io: bool) -> Vec<u8> {
         }
         v
     };
-    thread_rng().fill_bytes(buf.as_mut_slice());
+    rng().fill_bytes(buf.as_mut_slice());
     buf
 }
 
