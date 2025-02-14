@@ -110,7 +110,7 @@ fn schedule_copies<
             match fs::DirBuilder::new().mode(from_metadata.mode()).create(&to) {
                 Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {}
                 r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
-            };
+            }
             copy.run((from, to))?;
         } else if from_metadata.is_symlink() {
             let link =
@@ -431,7 +431,7 @@ mod compat {
         match mkdirat(CWD, to_path, from_mode) {
             Err(Errno::EXIST) => {}
             r => r.map_io_err(|| format!("Failed to create directory: {to_path:?}"))?,
-        };
+        }
 
         Ok(())
     }
@@ -680,7 +680,7 @@ mod compat {
         match fs::create_dir(to) {
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
             r => r?,
-        };
+        }
         #[cfg(unix)]
         let root_to_inode = Some(maybe_compute_root_to_inode(to, root_to_inode)?);
 

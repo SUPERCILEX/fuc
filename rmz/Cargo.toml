@@ -10,10 +10,10 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.27", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.29", features = ["derive", "wrap_help"] }
 error-stack = { version = "0.5.0", default-features = false, features = ["std"] }
 fuc_engine = { version = "1", path = "../fuc_engine" }
-indicatif = { version = "0.17.9", optional = true }
+indicatif = { version = "0.17.11", optional = true }
 thiserror = "2.0.11"
 tracing = { version = "0.1.41", optional = true }
 tracing-indicatif = { version = "0.3.9", optional = true }
@@ -29,8 +29,8 @@ remove_dir_all = { version = "1.0.0", features = ["parallel"] }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 rm_rayon = { path = "../comparisons/rm_rayon" }
 supercilex-tests = { version = "0.4.14", default-features = false, features = ["clap"] }
-tempfile = "3.15.0"
-trycmd = "0.15.8"
+tempfile = "3.16.0"
+trycmd = "0.15.9"
 
 [features]
 trace = ["fuc_engine/tracing", "dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy", "dep:tracy-client"]
