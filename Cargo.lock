@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "cpz"
-version = "1.1.6"
+version = "3.1.7"
 dependencies = [
  "cache-size",
  "clap",
@@ -712,12 +712,13 @@ dependencies = [
 
 [[package]]
 name = "fuc_engine"
-version = "1.1.6"
+version = "3.1.7"
 dependencies = [
  "bon",
  "crossbeam-channel",
  "ftzz",
  "io-adapters",
+ "once_cell",
  "rayon",
  "remove_dir_all",
  "rstest",
@@ -1407,7 +1408,7 @@ version = "0.0.0"
 
 [[package]]
 name = "rmz"
-version = "1.1.6"
+version = "3.1.7"
 dependencies = [
  "clap",
  "criterion",
