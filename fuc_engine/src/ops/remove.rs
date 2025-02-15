@@ -116,7 +116,6 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 mod compat {
     use std::{
         borrow::Cow,
-        cell::LazyCell,
         env,
         env::{current_dir, set_current_dir},
         ffi::{CStr, CString, OsStr},
@@ -139,6 +138,7 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use once_cell::sync::Lazy as LazyCell;
     use rustix::{
         fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
         io::Errno,
@@ -185,7 +185,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
+            if let Ok((tasks, thread)) = LazyCell::into_value(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
