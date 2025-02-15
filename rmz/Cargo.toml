@@ -8,11 +8,12 @@ repository.workspace = true
 keywords = ["tools", "files", "rm"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 clap = { version = "4.5.41", features = ["derive", "wrap_help"] }
 error-stack = { version = "0.5.0", default-features = false, features = ["std"] }
-fuc_engine = { version = "1", path = "../fuc_engine" }
+fuc_engine = { version = "3", path = "../fuc_engine" }
 indicatif = { version = "0.18.0", optional = true }
 thiserror = "2.0.12"
 tracing = { version = "0.1.41", optional = true }
