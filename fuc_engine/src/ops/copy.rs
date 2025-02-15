@@ -135,7 +135,7 @@ fn schedule_copies<
 mod compat {
     use std::{
         borrow::Cow,
-        cell::{Cell, LazyCell},
+        cell::Cell,
         env,
         ffi::{CStr, CString},
         fmt::{Debug, Formatter},
@@ -150,6 +150,7 @@ mod compat {
     };
 
     use crossbeam_channel::{Receiver, Sender};
+    use once_cell::sync::Lazy as LazyCell;
     use rustix::{
         fs::{
             AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, mkdirat,
@@ -201,7 +202,7 @@ mod compat {
         fn finish(self) -> Result<(), Error> {
             let Self { scheduling } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
+            if let Ok((tasks, thread)) = LazyCell::into_value(scheduling) {
                 drop(tasks);
                 thread.join().map_err(|_| Error::Join)??;
             }
