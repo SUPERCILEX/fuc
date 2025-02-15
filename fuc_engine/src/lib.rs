@@ -1,4 +1,3 @@
-#![cfg_attr(target_os = "linux", feature(lazy_cell_into_inner))]
 #![allow(clippy::needless_pass_by_value)]
 
 use std::{borrow::Cow, io, path::PathBuf};
