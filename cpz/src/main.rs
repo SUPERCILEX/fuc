@@ -276,8 +276,10 @@ fn copy(
             let to = {
                 let is_into_directory = *is_into_directory;
                 let mut to = to;
-                if is_into_directory && let Some(name) = from.file_name() {
-                    to.push(name);
+                if is_into_directory {
+                    if let Some(name) = from.file_name() {
+                        to.push(name);
+                    }
                 }
                 to
             };
