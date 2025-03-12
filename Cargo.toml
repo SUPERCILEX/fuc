@@ -26,7 +26,7 @@ edition.workspace = true
 publish = false
 
 [dev-dependencies]
-supercilex-tests = { version = "0.4.14", default-features = false }
+supercilex-tests = { version = "0.4.16", default-features = false }
 
 [profile.release]
 lto = true
