@@ -123,18 +123,14 @@ mod compat {
         fmt::{Debug, Formatter},
         fs,
         mem::MaybeUninit,
-        num::NonZeroUsize,
         os::{
             fd::{AsFd, OwnedFd},
             unix::ffi::OsStrExt,
         },
         path::{Path, PathBuf},
         sync::Arc,
-        thread,
-        thread::JoinHandle,
     };
 
-    use crossbeam_channel::{Receiver, Sender};
     use rustix::{
         fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
         io::Errno,
@@ -146,140 +142,95 @@ mod compat {
         ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
     };
 
-    struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
-        scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
+    struct ThreadState {
+        buf: [MaybeUninit<u8>; 8192],
+    }
+
+    impl ThreadState {
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+        fn new(unshare_io: bool) -> Result<Self, Error> {
+            if unshare_io {
+                unshare(UnshareFlags::FILES | UnshareFlags::FS)
+                    .map_io_err(|| "Failed to unshare I/O.")?;
+            }
+            Ok(Self {
+                buf: [MaybeUninit::uninit(); 8192],
+            })
+        }
+    }
+
+    struct Impl {
+        executor: LazyCell<LocknessExecutor<ThreadState>>,
     }
 
     pub fn remove_impl<'a>() -> impl DirectoryOp<Cow<'a, Path>> {
-        let scheduling = LazyCell::new(|| {
-            let (tx, rx) = crossbeam_channel::unbounded();
-            (tx, thread::spawn(|| root_worker_thread(rx)))
+        let executor = LazyCell::new(|| {
+            let unshare_io = env::var_os("NO_UNSHARE").is_none();
+            LocknessExecutor::builder()
+                .thread_initializer(|| ThreadState::new(unshare_io))
+                .build()
         });
 
-        Impl { scheduling }
+        Impl { executor }
     }
 
-    impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)>
-        DirectoryOp<Cow<'_, Path>> for Impl<LF>
-    {
+    impl DirectoryOp<Cow<'_, Path>> for Impl {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
-            let Self { ref scheduling } = *self;
+            let Self { ref executor } = *self;
 
-            let (tasks, _) = &**scheduling;
-            tasks
-                .send(TreeNode {
-                    path: path_buf_to_cstring(dir.into_owned())?,
-                    parent: None,
-                    messages: tasks.clone(),
-                })
-                .map_err(|_| Error::Internal)
+            let executor = &**executor;
+            let node = TreeNode {
+                path: path_buf_to_cstring(dir.into_owned())?,
+                parent: None,
+            };
+            executor.spawn(|executor, state| delete_dir(node, state, executor))
         }
 
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
-            let Self { scheduling } = self;
+            let Self { executor } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
-                drop(tasks);
-                thread.join().map_err(|_| Error::Join)??;
-            }
-            Ok(())
-        }
-    }
-
-    fn unshare_io() -> Result<(), Error> {
-        if env::var_os("NO_UNSHARE").is_none() {
-            unshare(UnshareFlags::FILES | UnshareFlags::FS)
-                .map_io_err(|| "Failed to unshare I/O.")?;
-        }
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare_io()?;
-
-        let mut available_parallelism = thread::available_parallelism()
-            .map(NonZeroUsize::get)
-            .unwrap_or(1)
-            - 1;
-
-        thread::scope(|scope| {
-            let mut threads = Vec::with_capacity(available_parallelism);
-
-            {
-                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
-                for message in &tasks {
-                    let mut maybe_spawn = || {
-                        if available_parallelism > 0 && !tasks.is_empty() {
-                            #[cfg(feature = "tracing")]
-                            tracing::event!(
-                                tracing::Level::TRACE,
-                                available_parallelism,
-                                "Spawning new thread."
-                            );
-
-                            available_parallelism -= 1;
-                            threads.push(scope.spawn({
-                                let tasks = tasks.clone();
-                                || worker_thread(tasks)
-                            }));
-                        }
-                    };
-                    maybe_spawn();
-
-                    delete_dir(message, &mut buf, maybe_spawn)?;
+            if let Ok(executor) = LazyCell::into_inner(executor) {
+                for error in executor.finish().map_err(|_| Error::Join)? {
+                    return Err(error);
                 }
             }
-
-            for thread in threads {
-                thread.join().map_err(|_| Error::Join)??;
-            }
             Ok(())
-        })
-    }
-
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
-        unshare_io()?;
-
-        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
-        for message in tasks {
-            delete_dir(message, &mut buf, || {})?;
         }
-        Ok(())
     }
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "info", skip(buf, maybe_spawn))
+        tracing::instrument(level = "info", skip(state, executor))
     )]
-    fn delete_dir(
-        node: TreeNode,
-        buf: &mut [MaybeUninit<u8>],
-        maybe_spawn: impl FnMut(),
-    ) -> Result<(), Error> {
-        let dir = openat(
-            CWD,
-            &node.path,
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
-            Mode::empty(),
-        )
-        .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
-        let node = delete_dir_contents(node, dir, buf, maybe_spawn)?;
-        delete_empty_dir_chain(node)
+    fn delete_dir(node: TreeNode, state: &mut ThreadState, executor: &LocknessExecutor) {
+        let run = || -> Result<(), Error> {
+            let dir = openat(
+                CWD,
+                &node.path,
+                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
+                Mode::empty(),
+            )
+            .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
+            let node = delete_dir_contents(node, dir, state, executor)?;
+            delete_empty_dir_chain(node)
+        };
+
+        if let Err(e) = run() {
+            executor.send(e);
+        }
     }
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "trace", skip(dir, buf, maybe_spawn))
+        tracing::instrument(level = "trace", skip(dir, buf, executor))
     )]
     fn delete_dir_contents(
         node: TreeNode,
         dir: OwnedFd,
-        buf: &mut [MaybeUninit<u8>],
-        mut maybe_spawn: impl FnMut(),
+        ThreadState { buf }: &mut ThreadState,
+        executor: &LocknessExecutor,
     ) -> Result<Option<TreeNode>, Error> {
         enum Arcable<T> {
             Raw(T),
@@ -340,8 +291,6 @@ mod compat {
                 continue;
             }
 
-            maybe_spawn();
-
             let node = match node {
                 Arcable::Raw(raw) => {
                     let arc = Arc::new(raw);
@@ -350,13 +299,11 @@ mod compat {
                 }
                 Arcable::Arced(ref node) => node.clone(),
             };
-            node.messages
-                .send(TreeNode {
-                    path: concat_cstrs(&node.path, file.file_name()),
-                    parent: Some(node.clone()),
-                    messages: node.messages.clone(),
-                })
-                .map_err(|_| Error::Internal)?;
+            let node = TreeNode {
+                path: concat_cstrs(&node.path, file.file_name()),
+                parent: Some(node.clone()),
+            };
+            executor.spawn(|executor, state| delete_dir(node, state, executor));
         }
 
         Ok(Arcable::into_inner(node))
@@ -365,12 +312,7 @@ mod compat {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
     fn delete_empty_dir_chain(mut node: Option<TreeNode>) -> Result<(), Error> {
         let mut result = Ok(());
-        while let Some(TreeNode {
-            ref path,
-            parent,
-            messages: _,
-        }) = node
-        {
+        while let Some(TreeNode { ref path, parent }) = node {
             if result.is_ok() {
                 result = unlinkat(CWD, path, AtFlags::REMOVEDIR)
                     .map_io_err(|| format!("Failed to delete directory: {path:?}"));
@@ -421,7 +363,6 @@ mod compat {
     struct TreeNode {
         path: CString,
         parent: Option<Arc<TreeNode>>,
-        messages: Sender<TreeNode>,
     }
 
     impl Debug for TreeNode {
