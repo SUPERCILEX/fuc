@@ -16,6 +16,7 @@ thiserror = "2.0.12"
 tracing = { version = "0.1.41", default-features = false, features = ["attributes"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+lockness-executor = { path = "/home/asaveau/Desktop/lockness/executor" }
 rustix = { version = "1.0.2", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]

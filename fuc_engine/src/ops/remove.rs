@@ -114,6 +114,12 @@ fn schedule_deletions<'a, I: Into<Cow<'a, Path>>, F: IntoIterator<Item = I>>(
 
 #[cfg(target_os = "linux")]
 mod compat {
+    use lockness_executor::{LocknessExecutor, LocknessMessenger};
+    use rustix::{
+        fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
+        io::Errno,
+        thread::{UnshareFlags, unshare},
+    };
     use std::{
         borrow::Cow,
         cell::LazyCell,
@@ -131,12 +137,6 @@ mod compat {
         sync::Arc,
     };
 
-    use rustix::{
-        fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
-        io::Errno,
-        thread::{UnshareFlags, unshare},
-    };
-
     use crate::{
         Error,
         ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
@@ -147,34 +147,49 @@ mod compat {
     }
 
     impl ThreadState {
-        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
-        fn new(unshare_io: bool) -> Result<Self, Error> {
-            if unshare_io {
-                unshare(UnshareFlags::FILES | UnshareFlags::FS)
-                    .map_io_err(|| "Failed to unshare I/O.")?;
+        #[cfg_attr(
+            feature = "tracing",
+            tracing::instrument(level = "trace", skip(messenger))
+        )]
+        fn init(messenger: &LocknessMessenger<Error>, unshare_io: bool) -> Self {
+            let run = || -> Result<_, Error> {
+                if unshare_io {
+                    unshare(UnshareFlags::FILES | UnshareFlags::FS)
+                        .map_io_err(|| "Failed to unshare I/O.")?;
+                }
+                Ok(())
+            };
+            if let Err(e) = run() {
+                messenger.send(e);
             }
-            Ok(Self {
+
+            Self {
                 buf: [MaybeUninit::uninit(); 8192],
-            })
+            }
         }
     }
 
-    struct Impl {
-        executor: LazyCell<LocknessExecutor<ThreadState>>,
+    struct Impl<F, L> {
+        executor: LazyCell<LocknessExecutor<Error, F>, L>,
     }
 
     pub fn remove_impl<'a>() -> impl DirectoryOp<Cow<'a, Path>> {
         let executor = LazyCell::new(|| {
             let unshare_io = env::var_os("NO_UNSHARE").is_none();
             LocknessExecutor::builder()
-                .thread_initializer(|| ThreadState::new(unshare_io))
+                .message_type::<Error>()
+                .thread_initializer(move |m| ThreadState::init(m, unshare_io))
                 .build()
         });
 
         Impl { executor }
     }
 
-    impl DirectoryOp<Cow<'_, Path>> for Impl {
+    impl<
+        F: (FnMut(&LocknessMessenger<Error>) -> ThreadState) + Send + 'static,
+        L: FnOnce() -> LocknessExecutor<Error, F>,
+    > DirectoryOp<Cow<'_, Path>> for Impl<F, L>
+    {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, dir: Cow<Path>) -> Result<(), Error> {
             let Self { ref executor } = *self;
@@ -184,7 +199,8 @@ mod compat {
                 path: path_buf_to_cstring(dir.into_owned())?,
                 parent: None,
             };
-            executor.spawn(|executor, state| delete_dir(node, state, executor))
+            executor.spawn(|ctx| delete_dir(node, ctx));
+            Ok(())
         }
 
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
@@ -204,7 +220,10 @@ mod compat {
         feature = "tracing",
         tracing::instrument(level = "info", skip(state, executor))
     )]
-    fn delete_dir(node: TreeNode, state: &mut ThreadState, executor: &LocknessExecutor) {
+    fn delete_dir<F: (FnMut(&LocknessMessenger<Error>) -> ThreadState) + Send + 'static>(
+        node: TreeNode,
+        (state, executor): (&mut ThreadState, &LocknessExecutor<Error, F>),
+    ) {
         let run = || -> Result<(), Error> {
             let dir = openat(
                 CWD,
@@ -226,11 +245,13 @@ mod compat {
         feature = "tracing",
         tracing::instrument(level = "trace", skip(dir, buf, executor))
     )]
-    fn delete_dir_contents(
+    fn delete_dir_contents<
+        F: (FnMut(&LocknessMessenger<Error>) -> ThreadState) + Send + 'static,
+    >(
         node: TreeNode,
         dir: OwnedFd,
         ThreadState { buf }: &mut ThreadState,
-        executor: &LocknessExecutor,
+        executor: &LocknessExecutor<Error, F>,
     ) -> Result<Option<TreeNode>, Error> {
         enum Arcable<T> {
             Raw(T),
@@ -303,7 +324,7 @@ mod compat {
                 path: concat_cstrs(&node.path, file.file_name()),
                 parent: Some(node.clone()),
             };
-            executor.spawn(|executor, state| delete_dir(node, state, executor));
+            executor.spawn(|ctx| delete_dir(node, ctx));
         }
 
         Ok(Arcable::into_inner(node))
