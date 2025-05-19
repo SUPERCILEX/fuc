@@ -115,6 +115,10 @@ fn schedule_copies<
         } else if from_metadata.is_symlink() {
             let link =
                 fs::read_link(&from).map_io_err(|| format!("Failed to read symlink: {from:?}"))?;
+            match fs::remove_file(&to) {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+                r => r.map_io_err(|| format!("Failed to remove existing file: {to:?}"))?,
+            }
             std::os::unix::fs::symlink(link, &to)
                 .map_io_err(|| format!("Failed to create symlink: {to:?}"))?;
         } else {
