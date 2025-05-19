@@ -107,10 +107,15 @@ fn schedule_copies<
         }
         .map_io_err(|| format!("Failed to read metadata for file: {from:?}"))?;
 
-        #[cfg(unix)]
         if from_metadata.is_dir() {
-            use std::os::unix::fs::{DirBuilderExt, MetadataExt};
-            match fs::DirBuilder::new().mode(from_metadata.mode()).create(&to) {
+            #[cfg_attr(not(unix), allow(unused_mut))]
+            let mut builder = fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+                builder.mode(from_metadata.mode());
+            }
+            match builder.create(&to) {
                 Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {}
                 r => r.map_io_err(|| format!("Failed to create directory: {to:?}"))?,
             }
@@ -126,8 +131,19 @@ fn schedule_copies<
                 fs::hard_link(&link, &to)
                     .map_io_err(|| format!("Failed to create hard link: {to:?} -> {link:?}"))?;
             } else {
-                std::os::unix::fs::symlink(&link, &to)
-                    .map_io_err(|| format!("Failed to create symlink: {to:?} -> {link:?}"))?;
+                let run = || {
+                    #[cfg(unix)]
+                    {
+                        std::os::unix::fs::symlink(&link, &to)
+                    }
+                    #[cfg(windows)]
+                    if fs::metadata(&link)?.file_type().is_dir() {
+                        std::os::windows::fs::symlink_dir(&link, &to)
+                    } else {
+                        std::os::windows::fs::symlink_file(&link, &to)
+                    }
+                };
+                run().map_io_err(|| format!("Failed to create symlink: {to:?} -> {link:?}"))?;
             }
         } else if hard_link {
             match fs::remove_file(&to) {
@@ -136,13 +152,6 @@ fn schedule_copies<
             }
             fs::hard_link(&from, &to)
                 .map_io_err(|| format!("Failed to create hard link: {to:?} -> {from:?}"))?;
-        } else {
-            fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
-        }
-
-        #[cfg(not(unix))]
-        if from_metadata.is_dir() {
-            copy.run((from, to))?;
         } else {
             fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
         }
