@@ -246,37 +246,37 @@ fn copy(
         })?;
     }
 
+    macro_rules! run_with_files {
+        ($files:expr) => {
+            CopyOp::builder()
+                .files($files)
+                .force(force)
+                .follow_symlinks(dereference)
+                .build()
+                .run()
+        };
+    }
     if from.len() > 1 {
-        CopyOp::builder()
-            .files(from.into_iter().map(|path| {
-                let to = path
-                    .file_name()
-                    .map_or_else(|| to.clone(), |name| to.join(name));
-                (path, to)
-            }))
-            .force(force)
-            .follow_symlinks(dereference)
-            .build()
-            .run()
+        run_with_files!(from.into_iter().map(|path| {
+            let to = path
+                .file_name()
+                .map_or_else(|| to.clone(), |name| to.join(name));
+            (path, to)
+        }))
     } else {
-        CopyOp::builder()
-            .files([{
-                let from = from.into_iter().next().unwrap();
-                let to = {
-                    let is_into_directory = *is_into_directory;
-                    let mut to = to;
-                    if is_into_directory && let Some(name) = from.file_name() {
-                        to.push(name);
-                    }
-                    to
-                };
+        run_with_files!([{
+            let from = from.into_iter().next().unwrap();
+            let to = {
+                let is_into_directory = *is_into_directory;
+                let mut to = to;
+                if is_into_directory && let Some(name) = from.file_name() {
+                    to.push(name);
+                }
+                to
+            };
 
-                (from, to)
-            }])
-            .force(force)
-            .follow_symlinks(dereference)
-            .build()
-            .run()
+            (from, to)
+        }])
     }
 }
 
