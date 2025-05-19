@@ -92,6 +92,9 @@ Options:
   -L, --dereference
           Follow symlinks in the files to be copied rather than copying the symlinks themselves
 
+  -l, --link
+          Create hard links instead of copying file data
+
   -h, --help
           Print help (use `-h` for a summary)
 

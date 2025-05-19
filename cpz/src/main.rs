@@ -50,6 +50,11 @@ struct Cpz {
     #[cfg_attr(windows, arg(default_value_t = true))]
     dereference: bool,
 
+    /// Create hard links instead of copying file data
+    #[arg(short = 'l', long, default_value_t = false)]
+    #[arg(aliases = ["hard-link"])]
+    link: bool,
+
     #[arg(short, long, short_alias = '?', global = true)]
     #[arg(action = ArgAction::Help, help = "Print help (use `--help` for more detail)")]
     #[arg(long_help = "Print help (use `-h` for a summary)")]
@@ -211,6 +216,7 @@ fn copy(
         force,
         reverse_args,
         dereference,
+        link,
         help: _,
     }: Cpz,
 ) -> Result<(), Error> {
@@ -252,6 +258,7 @@ fn copy(
                 .files($files)
                 .force(force)
                 .follow_symlinks(dereference)
+                .hard_link(link)
                 .build()
                 .run()
         };

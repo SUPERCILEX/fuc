@@ -32,6 +32,8 @@ pub struct CopyOp<
     force: bool,
     #[builder(default = false)]
     follow_symlinks: bool,
+    #[builder(default = false)]
+    hard_link: bool,
     #[builder(skip)]
     _marker1: PhantomData<&'a I1>,
     #[builder(skip)]
@@ -52,7 +54,7 @@ impl<
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let copy = compat::copy_impl(self.follow_symlinks);
+        let copy = compat::copy_impl(self.follow_symlinks, self.hard_link);
         let result = schedule_copies(self, &copy);
         copy.finish().and(result)
     }
@@ -73,6 +75,7 @@ fn schedule_copies<
         files,
         force,
         follow_symlinks,
+        hard_link,
         _marker1: _,
         _marker2: _,
     }: CopyOp<'a, 'b, I1, I2, F>,
@@ -119,8 +122,20 @@ fn schedule_copies<
                 Err(e) if e.kind() == io::ErrorKind::NotFound => (),
                 r => r.map_io_err(|| format!("Failed to remove existing file: {to:?}"))?,
             }
-            std::os::unix::fs::symlink(link, &to)
-                .map_io_err(|| format!("Failed to create symlink: {to:?}"))?;
+            if hard_link {
+                fs::hard_link(&link, &to)
+                    .map_io_err(|| format!("Failed to create hard link: {to:?} -> {link:?}"))?;
+            } else {
+                std::os::unix::fs::symlink(&link, &to)
+                    .map_io_err(|| format!("Failed to create symlink: {to:?} -> {link:?}"))?;
+            }
+        } else if hard_link {
+            match fs::remove_file(&to) {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+                r => r.map_io_err(|| format!("Failed to remove existing file: {to:?}"))?,
+            }
+            fs::hard_link(&from, &to)
+                .map_io_err(|| format!("Failed to create hard link: {to:?} -> {from:?}"))?;
         } else {
             fs::copy(&from, &to).map_io_err(|| format!("Failed to copy file: {from:?}"))?;
         }
@@ -156,8 +171,8 @@ mod compat {
     use crossbeam_channel::{Receiver, Sender};
     use rustix::{
         fs::{
-            AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, mkdirat,
-            openat, readlinkat, statx, symlinkat,
+            AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, linkat,
+            mkdirat, openat, readlinkat, statx, symlinkat,
         },
         io::Errno,
         thread::{UnshareFlags, unshare},
@@ -174,12 +189,17 @@ mod compat {
 
     pub fn copy_impl<'a, 'b>(
         follow_symlinks: bool,
+        hard_link: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
         let scheduling = LazyCell::new(move || {
             let (tx, rx) = crossbeam_channel::unbounded();
             (
                 tx,
-                thread::spawn(move || root_worker_thread(rx, follow_symlinks)),
+                if hard_link {
+                    thread::spawn(move || root_worker_thread::<true>(rx, follow_symlinks))
+                } else {
+                    thread::spawn(move || root_worker_thread::<false>(rx, follow_symlinks))
+                },
             )
         });
 
@@ -221,7 +241,10 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn root_worker_thread(tasks: Receiver<TreeNode>, follow_symlinks: bool) -> Result<(), Error> {
+    fn root_worker_thread<const HARD_LINK: bool>(
+        tasks: Receiver<TreeNode>,
+        follow_symlinks: bool,
+    ) -> Result<(), Error> {
         unshare_files()?;
 
         let mut available_parallelism = thread::available_parallelism()
@@ -265,13 +288,19 @@ mod compat {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                move || worker_thread(tasks, root_to_inode, follow_symlinks)
+                                move || {
+                                    worker_thread::<HARD_LINK>(
+                                        tasks,
+                                        root_to_inode,
+                                        follow_symlinks,
+                                    )
+                                }
                             }));
                         }
                     };
                     maybe_spawn();
 
-                    copy_dir(
+                    copy_dir::<HARD_LINK>(
                         node,
                         root_to_inode,
                         follow_symlinks,
@@ -290,7 +319,7 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn worker_thread(
+    fn worker_thread<const HARD_LINK: bool>(
         tasks: Receiver<TreeNode>,
         root_to_inode: u64,
         follow_symlinks: bool,
@@ -300,7 +329,7 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir(
+            copy_dir::<HARD_LINK>(
                 node,
                 root_to_inode,
                 follow_symlinks,
@@ -339,7 +368,7 @@ mod compat {
         feature = "tracing",
         tracing::instrument(level = "info", skip(messages, buf, symlink_buf_cache, maybe_spawn))
     )]
-    fn copy_dir(
+    fn copy_dir<const HARD_LINK: bool>(
         TreeNode { from, to, messages }: TreeNode,
         root_to_inode: u64,
         follow_symlinks: bool,
@@ -402,6 +431,20 @@ mod compat {
                         messages: messages.clone(),
                     })
                     .map_err(|_| Error::Internal)?;
+            } else if HARD_LINK {
+                let name = file.file_name();
+                let flags = if follow_symlinks {
+                    AtFlags::SYMLINK_FOLLOW
+                } else {
+                    AtFlags::empty()
+                };
+                linkat(&from_dir, name, &to_dir, name, flags).map_io_err(|| {
+                    format!(
+                        "Failed to create symlink: {:?} -> {:?}",
+                        join_cstr_paths(&to, name),
+                        join_cstr_paths(&from, name),
+                    )
+                })?;
             } else {
                 copy_one_file(
                     &from_dir,
@@ -614,8 +657,8 @@ mod compat {
 
         symlinkat(&from_symlink, &to_dir, file_name).map_io_err(|| {
             format!(
-                "Failed to create symlink: {:?}",
-                join_cstr_paths(to_path, file_name)
+                "Failed to create symlink: {:?} -> {from_symlink:?}",
+                join_cstr_paths(to_path, file_name),
             )
         })?;
 
@@ -652,18 +695,23 @@ mod compat {
 
     struct Impl {
         follow_symlinks: bool,
+        hard_link: bool,
     }
 
     pub fn copy_impl<'a, 'b>(
         follow_symlinks: bool,
+        hard_link: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        Impl { follow_symlinks }
+        Impl {
+            follow_symlinks,
+            hard_link,
+        }
     }
 
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
-            copy_dir(&from, to, self.follow_symlinks, None)
+            copy_dir(&from, to, self.follow_symlinks, self.hard_link, None)
                 .map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
@@ -678,6 +726,7 @@ mod compat {
         from: P,
         to: Q,
         follow_symlinks: bool,
+        hard_link: bool,
         root_to_inode: Option<u64>,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
@@ -713,17 +762,29 @@ mod compat {
                 };
 
                 if file_type.is_dir() {
-                    copy_dir(dir_entry.path(), to, follow_symlinks, root_to_inode)?;
+                    copy_dir(
+                        dir_entry.path(),
+                        to,
+                        follow_symlinks,
+                        hard_link,
+                        root_to_inode,
+                    )?;
                 } else if file_type.is_symlink() {
                     let from = fs::read_link(dir_entry.path())?;
-                    #[cfg(unix)]
-                    std::os::unix::fs::symlink(from, to)?;
-                    #[cfg(windows)]
-                    if fs::metadata(&from)?.file_type().is_dir() {
-                        std::os::windows::fs::symlink_dir(from, to)?;
+                    if hard_link {
+                        fs::hard_link(dir_entry.path(), to)?;
                     } else {
-                        std::os::windows::fs::symlink_file(from, to)?;
+                        #[cfg(unix)]
+                        std::os::unix::fs::symlink(from, to)?;
+                        #[cfg(windows)]
+                        if fs::metadata(&from)?.file_type().is_dir() {
+                            std::os::windows::fs::symlink_dir(from, to)?;
+                        } else {
+                            std::os::windows::fs::symlink_file(from, to)?;
+                        }
                     }
+                } else if hard_link {
+                    fs::hard_link(dir_entry.path(), to)?;
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }

@@ -28,7 +28,7 @@ io-adapters = "0.4.0"
 remove_dir_all = { version = "1.0.0", features = ["parallel"] }
 rm_og_crappy = { path = "../comparisons/rm_og_crappy" }
 rm_rayon = { path = "../comparisons/rm_rayon" }
-supercilex-tests = { version = "0.4.16", default-features = false, features = ["clap"] }
+supercilex-tests = { version = "0.4.17", default-features = false, features = ["clap"] }
 tempfile = "3.20.0"
 trycmd = "0.15.9"
 
