@@ -683,6 +683,8 @@ mod compat {
         }
         #[cfg(unix)]
         let root_to_inode = Some(maybe_compute_root_to_inode(to, root_to_inode)?);
+        #[cfg(not(unix))]
+        let _ = root_to_inode;
 
         from.as_ref()
             .read_dir()?
@@ -699,27 +701,25 @@ mod compat {
                 }
 
                 let to = to.join(dir_entry.file_name());
-                #[allow(unused_mut)]
-                let mut file_type = dir_entry.file_type()?;
-                #[cfg(unix)]
-                if follow_symlinks && file_type.is_symlink() {
-                    file_type = fs::metadata(dir_entry.path())?.file_type();
-                }
-                let file_type = file_type;
+                let file_type = dir_entry.file_type()?;
+                let file_type = if follow_symlinks && file_type.is_symlink() {
+                    fs::metadata(dir_entry.path())?.file_type()
+                } else {
+                    file_type
+                };
 
-                #[cfg(unix)]
                 if file_type.is_dir() {
                     copy_dir(dir_entry.path(), to, follow_symlinks, root_to_inode)?;
                 } else if file_type.is_symlink() {
-                    std::os::unix::fs::symlink(fs::read_link(dir_entry.path())?, to)?;
-                } else {
-                    fs::copy(dir_entry.path(), to)?;
-                }
-
-                #[cfg(not(unix))]
-                if file_type.is_dir() {
-                    let (_, _) = (follow_symlinks, root_to_inode);
-                    copy_dir(dir_entry.path(), to, follow_symlinks, root_to_inode)?;
+                    let from = fs::read_link(dir_entry.path())?;
+                    #[cfg(unix)]
+                    std::os::unix::fs::symlink(from, to)?;
+                    #[cfg(windows)]
+                    if fs::metadata(&from)?.file_type().is_dir() {
+                        std::os::windows::fs::symlink_dir(from, to)?;
+                    } else {
+                        std::os::windows::fs::symlink_file(from, to)?;
+                    }
                 } else {
                     fs::copy(dir_entry.path(), to)?;
                 }

@@ -47,6 +47,9 @@ struct Cpz {
     /// symlinks themselves
     #[arg(short = 'L', long, default_value_t = false)]
     #[arg(aliases = ["follow-symlinks"])]
+    // Ensure we don't try to create symlinks by default as doing so is considered a privileged
+    // operation: https://doc.rust-lang.org/std/os/windows/fs/fn.symlink_file.html#limitations
+    #[cfg_attr(windows, arg(default_value_t = true))]
     dereference: bool,
 
     #[arg(short, long, short_alias = '?', global = true)]
