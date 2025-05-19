@@ -1,9 +1,9 @@
 use std::{borrow::Cow, io};
 
-pub use copy::{CopyOp, copy_file};
+pub use copy::{CopyOp, CopyOpBuilder, copy_file};
 #[cfg(target_os = "linux")]
 use linux::{concat_cstrs, join_cstr_paths, path_buf_to_cstring};
-pub use remove::{RemoveOp, remove_file};
+pub use remove::{RemoveOp, RemoveOpBuilder, remove_file};
 
 use crate::Error;
 

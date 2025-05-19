@@ -5,7 +5,10 @@ use std::{borrow::Cow, io, path::PathBuf};
 
 use thiserror::Error;
 
-pub use crate::ops::{CopyOp, RemoveOp, copy_file, remove_file, remove_file as remove_dir_all};
+pub use crate::ops::{
+    CopyOp, CopyOpBuilder, RemoveOp, RemoveOpBuilder, copy_file, remove_file,
+    remove_file as remove_dir_all,
+};
 
 mod ops;
 

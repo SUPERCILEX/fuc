@@ -46,7 +46,7 @@ pub struct fuc_engine::CopyOp<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow
 impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::run(self) -> core::result::Result<(), fuc_engine::Error>
 impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> fuc_engine::CopyOp<'a, 'b, I1, I2, F>
-pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::builder() -> fuc_engine::ops::copy::CopyOpBuilder<'a, 'b, I1, I2, F>
+pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::builder() -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F>
 impl<'a, 'b, I1: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::fmt::Debug + core::iter::traits::collect::IntoIterator<Item = (I1, I2)>> core::fmt::Debug for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a, 'b, I1, I2, F> core::marker::Freeze for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::Freeze
@@ -73,11 +73,45 @@ impl<T> core::convert::From<T> for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 pub fn fuc_engine::CopyOp<'a, 'b, I1, I2, F>::from(t: T) -> T
 impl<T> tracing::instrument::Instrument for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
 impl<T> tracing::instrument::WithSubscriber for fuc_engine::CopyOp<'a, 'b, I1, I2, F>
+pub struct fuc_engine::CopyOpBuilder<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>, S: fuc_engine::ops::copy::copy_op_builder::State>
+impl<'a, 'b, I1: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, I2: core::convert::Into<alloc::borrow::Cow<'b, std::path::Path>> + 'b, F: core::iter::traits::collect::IntoIterator<Item = (I1, I2)>, S: fuc_engine::ops::copy::copy_op_builder::State> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::build(self) -> fuc_engine::CopyOp<'a, 'b, I1, I2, F> where S: fuc_engine::ops::copy::copy_op_builder::IsComplete
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::files(self, value: F) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetFiles<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::Files: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::follow_symlinks(self, value: bool) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetFollowSymlinks<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::FollowSymlinks: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::force(self, value: bool) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetForce<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::Force: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::hard_link(self, value: bool) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetHardLink<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::HardLink: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::maybe_follow_symlinks(self, value: core::option::Option<bool>) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetFollowSymlinks<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::FollowSymlinks: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::maybe_force(self, value: core::option::Option<bool>) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetForce<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::Force: bon::builder_state::IsUnset
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::maybe_hard_link(self, value: core::option::Option<bool>) -> fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, fuc_engine::ops::copy::copy_op_builder::SetHardLink<S>> where <S as fuc_engine::ops::copy::copy_op_builder::State>::HardLink: bon::builder_state::IsUnset
+impl<'a, 'b, I1, I2, F, S> core::marker::Freeze for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Freeze
+impl<'a, 'b, I1, I2, F, S> core::marker::Send for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Send
+impl<'a, 'b, I1, I2, F, S> core::marker::Sync for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Sync
+impl<'a, 'b, I1, I2, F, S> core::marker::Unpin for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Unpin
+impl<'a, 'b, I1, I2, F, S> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::panic::unwind_safe::RefUnwindSafe
+impl<'a, 'b, I1, I2, F, S> core::panic::unwind_safe::UnwindSafe for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::panic::unwind_safe::UnwindSafe
+impl<T, U> core::convert::Into<U> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where U: core::convert::From<T>
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where U: core::convert::Into<T>
+pub type fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::Error = core::convert::Infallible
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where U: core::convert::TryFrom<T>
+pub type fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where T: 'static + ?core::marker::Sized
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where T: ?core::marker::Sized
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where T: ?core::marker::Sized
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>
+pub fn fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>::from(t: T) -> T
+impl<T> tracing::instrument::Instrument for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>
+impl<T> tracing::instrument::WithSubscriber for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S>
 pub struct fuc_engine::RemoveOp<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>>
 impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>>, F: core::iter::traits::collect::IntoIterator<Item = I>> fuc_engine::RemoveOp<'a, I, F>
 pub fn fuc_engine::RemoveOp<'a, I, F>::run(self) -> core::result::Result<(), fuc_engine::Error>
 impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>> fuc_engine::RemoveOp<'a, I, F>
-pub fn fuc_engine::RemoveOp<'a, I, F>::builder() -> fuc_engine::ops::remove::RemoveOpBuilder<'a, I, F>
+pub fn fuc_engine::RemoveOp<'a, I, F>::builder() -> fuc_engine::RemoveOpBuilder<'a, I, F>
 impl<'a, I: core::fmt::Debug + core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::fmt::Debug + core::iter::traits::collect::IntoIterator<Item = I>> core::fmt::Debug for fuc_engine::RemoveOp<'a, I, F>
 pub fn fuc_engine::RemoveOp<'a, I, F>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl<'a, I, F> core::marker::Freeze for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::Freeze
@@ -104,6 +138,38 @@ impl<T> core::convert::From<T> for fuc_engine::RemoveOp<'a, I, F>
 pub fn fuc_engine::RemoveOp<'a, I, F>::from(t: T) -> T
 impl<T> tracing::instrument::Instrument for fuc_engine::RemoveOp<'a, I, F>
 impl<T> tracing::instrument::WithSubscriber for fuc_engine::RemoveOp<'a, I, F>
+pub struct fuc_engine::RemoveOpBuilder<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>, S: fuc_engine::ops::remove::remove_op_builder::State>
+impl<'a, I: core::convert::Into<alloc::borrow::Cow<'a, std::path::Path>> + 'a, F: core::iter::traits::collect::IntoIterator<Item = I>, S: fuc_engine::ops::remove::remove_op_builder::State> fuc_engine::RemoveOpBuilder<'a, I, F, S>
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::build(self) -> fuc_engine::RemoveOp<'a, I, F> where S: fuc_engine::ops::remove::remove_op_builder::IsComplete
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::files(self, value: F) -> fuc_engine::RemoveOpBuilder<'a, I, F, fuc_engine::ops::remove::remove_op_builder::SetFiles<S>> where <S as fuc_engine::ops::remove::remove_op_builder::State>::Files: bon::builder_state::IsUnset
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::force(self, value: bool) -> fuc_engine::RemoveOpBuilder<'a, I, F, fuc_engine::ops::remove::remove_op_builder::SetForce<S>> where <S as fuc_engine::ops::remove::remove_op_builder::State>::Force: bon::builder_state::IsUnset
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::maybe_force(self, value: core::option::Option<bool>) -> fuc_engine::RemoveOpBuilder<'a, I, F, fuc_engine::ops::remove::remove_op_builder::SetForce<S>> where <S as fuc_engine::ops::remove::remove_op_builder::State>::Force: bon::builder_state::IsUnset
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::maybe_preserve_root(self, value: core::option::Option<bool>) -> fuc_engine::RemoveOpBuilder<'a, I, F, fuc_engine::ops::remove::remove_op_builder::SetPreserveRoot<S>> where <S as fuc_engine::ops::remove::remove_op_builder::State>::PreserveRoot: bon::builder_state::IsUnset
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::preserve_root(self, value: bool) -> fuc_engine::RemoveOpBuilder<'a, I, F, fuc_engine::ops::remove::remove_op_builder::SetPreserveRoot<S>> where <S as fuc_engine::ops::remove::remove_op_builder::State>::PreserveRoot: bon::builder_state::IsUnset
+impl<'a, I, F, S> core::marker::Freeze for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Freeze
+impl<'a, I, F, S> core::marker::Send for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Send
+impl<'a, I, F, S> core::marker::Sync for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Sync
+impl<'a, I, F, S> core::marker::Unpin for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Unpin
+impl<'a, I, F, S> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::panic::unwind_safe::RefUnwindSafe
+impl<'a, I, F, S> core::panic::unwind_safe::UnwindSafe for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::panic::unwind_safe::UnwindSafe
+impl<T, U> core::convert::Into<U> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where U: core::convert::From<T>
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where U: core::convert::Into<T>
+pub type fuc_engine::RemoveOpBuilder<'a, I, F, S>::Error = core::convert::Infallible
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where U: core::convert::TryFrom<T>
+pub type fuc_engine::RemoveOpBuilder<'a, I, F, S>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for fuc_engine::RemoveOpBuilder<'a, I, F, S> where T: 'static + ?core::marker::Sized
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where T: ?core::marker::Sized
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where T: ?core::marker::Sized
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for fuc_engine::RemoveOpBuilder<'a, I, F, S>
+pub fn fuc_engine::RemoveOpBuilder<'a, I, F, S>::from(t: T) -> T
+impl<T> tracing::instrument::Instrument for fuc_engine::RemoveOpBuilder<'a, I, F, S>
+impl<T> tracing::instrument::WithSubscriber for fuc_engine::RemoveOpBuilder<'a, I, F, S>
 pub fn fuc_engine::copy_file<P: core::convert::AsRef<std::path::Path>, Q: core::convert::AsRef<std::path::Path>>(from: P, to: Q) -> core::result::Result<(), fuc_engine::Error>
 pub fn fuc_engine::remove_dir_all<P: core::convert::AsRef<std::path::Path>>(path: P) -> core::result::Result<(), fuc_engine::Error>
 pub fn fuc_engine::remove_file<P: core::convert::AsRef<std::path::Path>>(path: P) -> core::result::Result<(), fuc_engine::Error>
