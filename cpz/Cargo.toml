@@ -10,7 +10,7 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.32", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.38", features = ["derive", "wrap_help"] }
 error-stack = { version = "0.5.0", default-features = false, features = ["std"] }
 fuc_engine = { version = "1", path = "../fuc_engine" }
 indicatif = { version = "0.17.11", optional = true }
@@ -23,15 +23,15 @@ tracy-client = { version = "0.18.0", optional = true }
 
 [dev-dependencies]
 cache-size = "0.7.0"
-criterion = "0.5.1"
+criterion = "0.6.0"
 memmap2 = "0.9.5"
-rand = "0.9.0"
+rand = "0.9.1"
 supercilex-tests = { version = "0.4.16", default-features = false, features = ["clap"] }
-tempfile = "3.18.0"
+tempfile = "3.20.0"
 trycmd = "0.15.9"
 
 [target.'cfg(unix)'.dev-dependencies]
-rustix = { version = "1.0.2", features = ["fs", "pipe"] }
+rustix = { version = "1.0.7", features = ["fs", "pipe"] }
 
 [features]
 trace = ["fuc_engine/tracing", "dep:tracing", "dep:tracing-subscriber", "dep:tracing-tracy", "dep:tracy-client"]

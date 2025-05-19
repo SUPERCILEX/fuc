@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use std::{
     cell::LazyCell,
     fs,
