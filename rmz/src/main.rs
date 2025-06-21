@@ -161,9 +161,8 @@ fn main() -> error_stack::Result<(), CliError> {
             Error::NotFound { file: _ } => {
                 Report::from(wrapper).attach_printable("Use --force to ignore.")
             }
-            Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
-                Report::from(wrapper)
-            }
+            Error::PreserveRoot | Error::BadPath => Report::from(wrapper),
+            Error::Join(e) => Report::from(e).change_context(wrapper),
             Error::AlreadyExists { file: _ } => unreachable!(),
         }
     })
