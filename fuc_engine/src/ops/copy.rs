@@ -220,11 +220,19 @@ mod compat {
     {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
+            let to = path_buf_to_cstring(to.into_owned())?;
+            let root_to_inode = {
+                let to_metadata = statx(CWD, &to, AtFlags::SYMLINK_NOFOLLOW, StatxFlags::INO)
+                    .map_io_err(|| format!("Failed to stat directory: {to:?}"))?;
+                to_metadata.stx_ino
+            };
+
             let (tasks, _) = &*self.scheduling;
             tasks
                 .send(TreeNode {
                     from: path_buf_to_cstring(from.into_owned())?,
-                    to: path_buf_to_cstring(to.into_owned())?,
+                    to,
+                    root_to_inode,
                     messages: tasks.clone(),
                 })
                 .map_err(|_| Error::Internal)
@@ -265,26 +273,9 @@ mod compat {
             let mut threads = Vec::with_capacity(available_parallelism);
 
             {
-                let mut root_to_inode = None;
                 let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
-                    let root_to_inode = if let Some(root_to_inode) = root_to_inode {
-                        root_to_inode
-                    } else {
-                        let to_dir = openat(
-                            CWD,
-                            &node.to,
-                            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::PATH,
-                            Mode::empty(),
-                        )
-                        .map_io_err(|| format!("Failed to open directory: {:?}", node.to))?;
-                        let to_metadata = statx(to_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::INO)
-                            .map_io_err(|| format!("Failed to stat directory: {:?}", node.to))?;
-                        root_to_inode = Some(to_metadata.stx_ino);
-                        to_metadata.stx_ino
-                    };
-
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
                             #[cfg(feature = "tracing")]
@@ -297,13 +288,7 @@ mod compat {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                move || {
-                                    worker_thread::<HARD_LINK>(
-                                        tasks,
-                                        root_to_inode,
-                                        follow_symlinks,
-                                    )
-                                }
+                                move || worker_thread::<HARD_LINK>(tasks, follow_symlinks)
                             }));
                         }
                     };
@@ -311,7 +296,6 @@ mod compat {
 
                     copy_dir::<HARD_LINK>(
                         node,
-                        root_to_inode,
                         follow_symlinks,
                         &mut buf,
                         &symlink_buf_cache,
@@ -330,7 +314,6 @@ mod compat {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread<const HARD_LINK: bool>(
         tasks: Receiver<TreeNode>,
-        root_to_inode: u64,
         follow_symlinks: bool,
     ) -> Result<(), Error> {
         unshare_files()?;
@@ -338,14 +321,7 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir::<HARD_LINK>(
-                node,
-                root_to_inode,
-                follow_symlinks,
-                &mut buf,
-                &symlink_buf_cache,
-                || {},
-            )?;
+            copy_dir::<HARD_LINK>(node, follow_symlinks, &mut buf, &symlink_buf_cache, || {})?;
         }
         Ok(())
     }
@@ -378,8 +354,12 @@ mod compat {
         tracing::instrument(level = "info", skip(messages, buf, symlink_buf_cache, maybe_spawn))
     )]
     fn copy_dir<const HARD_LINK: bool>(
-        TreeNode { from, to, messages }: TreeNode,
-        root_to_inode: u64,
+        TreeNode {
+            from,
+            to,
+            root_to_inode,
+            messages,
+        }: TreeNode,
         follow_symlinks: bool,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
@@ -437,6 +417,7 @@ mod compat {
                     .send(TreeNode {
                         from,
                         to,
+                        root_to_inode,
                         messages: messages.clone(),
                     })
                     .map_err(|_| Error::Internal)?;
@@ -678,6 +659,7 @@ mod compat {
     struct TreeNode {
         from: CString,
         to: CString,
+        root_to_inode: u64,
         messages: Sender<TreeNode>,
     }
 
@@ -686,6 +668,7 @@ mod compat {
             f.debug_struct("TreeNode")
                 .field("from", &self.from)
                 .field("to", &self.to)
+                .field("root_to_inode", &self.root_to_inode)
                 .finish_non_exhaustive()
         }
     }
@@ -720,8 +703,24 @@ mod compat {
     impl DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
-            copy_dir(&from, to, self.follow_symlinks, self.hard_link, None)
-                .map_io_err(|| format!("Failed to copy directory: {from:?}"))
+            #[cfg(unix)]
+            let root_to_inode = {
+                use std::os::unix::fs::MetadataExt;
+                fs::metadata(&*to)
+                    .map_io_err(|| format!("Failed to get inode: {to:?}"))?
+                    .ino()
+            };
+            // TODO get rid of this crap once https://github.com/tokio-rs/tracing/issues/3320 is fixed
+            #[cfg(not(unix))]
+            let root_to_inode = 0;
+            copy_dir(
+                &from,
+                to,
+                self.follow_symlinks,
+                self.hard_link,
+                root_to_inode,
+            )
+            .map_io_err(|| format!("Failed to copy directory: {from:?}"))
         }
 
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
@@ -736,15 +735,13 @@ mod compat {
         to: Q,
         follow_symlinks: bool,
         hard_link: bool,
-        root_to_inode: Option<u64>,
+        root_to_inode: u64,
     ) -> Result<(), io::Error> {
         let to = to.as_ref();
         match fs::create_dir(to) {
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
             r => r?,
         }
-        #[cfg(unix)]
-        let root_to_inode = Some(maybe_compute_root_to_inode(to, root_to_inode)?);
         #[cfg(not(unix))]
         let _ = root_to_inode;
 
@@ -757,7 +754,7 @@ mod compat {
                 #[cfg(unix)]
                 {
                     use std::os::unix::fs::DirEntryExt;
-                    if Some(dir_entry.ino()) == root_to_inode {
+                    if dir_entry.ino() == root_to_inode {
                         return Ok(());
                     }
                 }
@@ -800,19 +797,5 @@ mod compat {
 
                 Ok(())
             })
-    }
-
-    #[cfg(unix)]
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
-    fn maybe_compute_root_to_inode<P: AsRef<Path> + Debug>(
-        to: P,
-        root_to_inode: Option<u64>,
-    ) -> Result<u64, io::Error> {
-        Ok(if let Some(ino) = root_to_inode {
-            ino
-        } else {
-            use std::os::unix::fs::MetadataExt;
-            fs::metadata(to)?.ino()
-        })
     }
 }
