@@ -159,9 +159,8 @@ fn main() -> Result<(), Report<CliError>> {
                 Report::from(error).attach(context).change_context(wrapper)
             }
             Error::NotFound { file: _ } => Report::from(wrapper).attach("Use --force to ignore."),
-            Error::PreserveRoot | Error::Join | Error::BadPath | Error::Internal => {
-                Report::from(wrapper)
-            }
+            Error::PreserveRoot | Error::BadPath => Report::from(wrapper),
+            Error::Join(e) => Report::from(e).change_context(wrapper),
             Error::AlreadyExists { file: _ } => unreachable!(),
         }
     })

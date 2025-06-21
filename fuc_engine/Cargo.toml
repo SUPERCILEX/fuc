@@ -11,11 +11,11 @@ license.workspace = true
 
 [dependencies]
 bon = "3.9.0"
-crossbeam-channel = "0.5.15"
 thiserror = "2.0.18"
 tracing = { version = "0.1.44", default-features = false, features = ["attributes"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+lockness-executor = { path = "/home/asaveau/Desktop/wip/lockness/executor" }
 rustix = { version = "1.1.4", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]

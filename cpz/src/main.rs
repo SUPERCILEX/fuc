@@ -201,7 +201,8 @@ fn main() -> Result<(), Report<CliError>> {
                     Ok(false) | Err(_) => report.attach("Use --force to overwrite."),
                 }
             }
-            Error::Join | Error::BadPath | Error::Internal => Report::from(wrapper),
+            Error::BadPath => Report::from(wrapper),
+            Error::Join(e) => Report::from(e).change_context(wrapper),
             Error::PreserveRoot | Error::NotFound { file: _ } => unreachable!(),
         }
     })

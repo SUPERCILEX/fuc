@@ -43,6 +43,12 @@ Copy a directory:
 
 ```console
 $ cpz from_dir to_dir
+? 101
+
+thread 'main' (60395) panicked at /home/asaveau/Desktop/wip/lockness/executor/src/lib.rs:104:9:
+not yet implemented
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
 ```
 
 Overwrite existing files:

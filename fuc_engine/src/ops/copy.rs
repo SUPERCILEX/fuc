@@ -166,18 +166,18 @@ mod compat {
         cell::{Cell, LazyCell},
         env,
         ffi::{CStr, CString},
-        fmt::{Debug, Formatter},
+        fmt::Debug,
         fs::File,
         io,
         mem::MaybeUninit,
-        num::NonZeroUsize,
         os::unix::io::{AsFd, OwnedFd},
         path::Path,
-        thread,
-        thread::JoinHandle,
     };
 
-    use crossbeam_channel::{Receiver, Sender};
+    use lockness_executor::{
+        LocknessExecutor, LocknessExecutorBuilder, Spawner,
+        config::{Config, Lifo, True},
+    };
     use rustix::{
         fs::{
             AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, linkat,
@@ -192,34 +192,80 @@ mod compat {
         ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
     };
 
-    struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
-        scheduling: LazyCell<(Sender<TreeNode>, JoinHandle<Result<(), Error>>), LF>,
+    struct ThreadState {
+        follow_symlinks: bool,
+        buf: [MaybeUninit<u8>; 8192],
+        symlink_buf_cache: Cell<Vec<u8>>,
+    }
+
+    #[derive(Clone, Debug)]
+    struct Params {
+        follow_symlinks: bool,
+        unshare_io: bool,
+    }
+
+    impl Config for Params {
+        const NUM_TASK_TYPES: usize = 1;
+        type AllowTasksToSpawnMoreTasks = True;
+        type DequeBias = Lifo;
+
+        type Error = Error;
+        type ThreadLocalState = ThreadState;
+
+        #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+        #[inline]
+        fn thread_initializer(self) -> Result<Self::ThreadLocalState, Self::Error> {
+            let Self {
+                follow_symlinks,
+                unshare_io,
+            } = self;
+
+            if unshare_io {
+                unsafe { unshare_unsafe(UnshareFlags::FILES) }
+                    .map_io_err(|| "Failed to unshare FD table.")?;
+            }
+
+            Ok(ThreadState {
+                follow_symlinks,
+                buf: [MaybeUninit::uninit(); 8192],
+                symlink_buf_cache: Cell::new(Vec::new()),
+            })
+        }
+    }
+
+    struct Impl<C, LF> {
+        executor: LazyCell<LocknessExecutor<C>, LF>,
+        hard_link: bool,
     }
 
     pub fn copy_impl<'a, 'b>(
         follow_symlinks: bool,
         hard_link: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
-        let scheduling = LazyCell::new(move || {
-            let (tx, rx) = crossbeam_channel::unbounded();
-            (
-                tx,
-                if hard_link {
-                    thread::spawn(move || root_worker_thread::<true>(rx, follow_symlinks))
-                } else {
-                    thread::spawn(move || root_worker_thread::<false>(rx, follow_symlinks))
-                },
-            )
+        let executor = LazyCell::new(move || {
+            let unshare_io = env::var_os("NO_UNSHARE").is_none();
+            LocknessExecutorBuilder::new().build(Params {
+                follow_symlinks,
+                unshare_io,
+            })
         });
 
-        Impl { scheduling }
+        Impl {
+            executor,
+            hard_link,
+        }
     }
 
-    impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)>
-        DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)> for Impl<LF>
+    impl<LF: FnOnce() -> LocknessExecutor<Params>> DirectoryOp<(Cow<'_, Path>, Cow<'_, Path>)>
+        for Impl<Params, LF>
     {
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn run(&self, (from, to): (Cow<Path>, Cow<Path>)) -> Result<(), Error> {
+            let &Impl {
+                ref executor,
+                hard_link,
+            } = self;
+
             let to = path_buf_to_cstring(to.into_owned())?;
             let root_to_inode = {
                 let to_metadata = statx(CWD, &to, AtFlags::SYMLINK_NOFOLLOW, StatxFlags::INO)
@@ -227,107 +273,47 @@ mod compat {
                 to_metadata.stx_ino
             };
 
-            let (tasks, _) = &*self.scheduling;
-            tasks
-                .send(TreeNode {
-                    from: path_buf_to_cstring(from.into_owned())?,
-                    to,
-                    root_to_inode,
-                    messages: tasks.clone(),
-                })
-                .map_err(|_| Error::Internal)
+            let node = TreeNode {
+                from: path_buf_to_cstring(from.into_owned())?,
+                to,
+                root_to_inode,
+            };
+            let spawner = executor.spawner();
+            if hard_link {
+                spawner
+                    .buffered()
+                    .spawn_recursive(|spawner, state| copy_dir::<true>(node, state, spawner));
+            } else {
+                spawner
+                    .buffered()
+                    .spawn_recursive(|spawner, state| copy_dir::<false>(node, state, spawner));
+            }
+
+            Ok(())
         }
 
         #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(self)))]
         fn finish(self) -> Result<(), Error> {
-            let Self { scheduling } = self;
+            let Self {
+                executor,
+                hard_link: _,
+            } = self;
 
-            if let Ok((tasks, thread)) = LazyCell::into_inner(scheduling) {
-                drop(tasks);
-                thread.join().map_err(|_| Error::Join)??;
-            }
-            Ok(())
-        }
-    }
-
-    fn unshare_files() -> Result<(), Error> {
-        if env::var_os("NO_UNSHARE").is_none() {
-            unsafe { unshare_unsafe(UnshareFlags::FILES) }
-                .map_io_err(|| "Failed to unshare FD table.")?;
-        }
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn root_worker_thread<const HARD_LINK: bool>(
-        tasks: Receiver<TreeNode>,
-        follow_symlinks: bool,
-    ) -> Result<(), Error> {
-        unshare_files()?;
-
-        let mut available_parallelism =
-            thread::available_parallelism().map_or(1, NonZeroUsize::get) - 1;
-
-        thread::scope(|scope| {
-            let mut threads = Vec::with_capacity(available_parallelism);
-
+            if let Ok(executor) = LazyCell::into_inner(executor)
+                && let Some(e) = executor.finisher().next()
             {
-                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
-                let symlink_buf_cache = Cell::new(Vec::new());
-                for node in &tasks {
-                    let mut maybe_spawn = || {
-                        if available_parallelism > 0 && !tasks.is_empty() {
-                            #[cfg(feature = "tracing")]
-                            tracing::event!(
-                                tracing::Level::TRACE,
-                                available_parallelism,
-                                "Spawning new thread."
-                            );
-
-                            available_parallelism -= 1;
-                            threads.push(scope.spawn({
-                                let tasks = tasks.clone();
-                                move || worker_thread::<HARD_LINK>(tasks, follow_symlinks)
-                            }));
-                        }
-                    };
-                    maybe_spawn();
-
-                    copy_dir::<HARD_LINK>(
-                        node,
-                        follow_symlinks,
-                        &mut buf,
-                        &symlink_buf_cache,
-                        maybe_spawn,
-                    )?;
-                }
-            }
-
-            for thread in threads {
-                thread.join().map_err(|_| Error::Join)??;
+                return Err(match e {
+                    lockness_executor::Error::Panic(p) => Error::Join(p),
+                    lockness_executor::Error::Error(e) => e,
+                });
             }
             Ok(())
-        })
-    }
-
-    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
-    fn worker_thread<const HARD_LINK: bool>(
-        tasks: Receiver<TreeNode>,
-        follow_symlinks: bool,
-    ) -> Result<(), Error> {
-        unshare_files()?;
-
-        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
-        let symlink_buf_cache = Cell::new(Vec::new());
-        for node in tasks {
-            copy_dir::<HARD_LINK>(node, follow_symlinks, &mut buf, &symlink_buf_cache, || {})?;
         }
-        Ok(())
     }
 
     #[cold]
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(dir)))]
-    pub fn get_file_type(
+    fn get_file_type(
         dir: impl AsFd,
         file_name: &CStr,
         path: &CString,
@@ -350,19 +336,20 @@ mod compat {
 
     #[cfg_attr(
         feature = "tracing",
-        tracing::instrument(level = "info", skip(messages, buf, symlink_buf_cache, maybe_spawn))
+        tracing::instrument(level = "info", skip(buf, symlink_buf_cache, spawner))
     )]
     fn copy_dir<const HARD_LINK: bool>(
         TreeNode {
             from,
             to,
             root_to_inode,
-            messages,
         }: TreeNode,
-        follow_symlinks: bool,
-        buf: &mut [MaybeUninit<u8>],
-        symlink_buf_cache: &Cell<Vec<u8>>,
-        mut maybe_spawn: impl FnMut(),
+        &mut ThreadState {
+            follow_symlinks,
+            ref mut buf,
+            ref mut symlink_buf_cache,
+        }: &mut ThreadState,
+        spawner: &Spawner<Params>,
     ) -> Result<(), Error> {
         let from_dir = openat(
             CWD,
@@ -387,7 +374,13 @@ mod compat {
 
         let mut failed_cross_device = false;
         let mut raw_dir = RawDir::new(&from_dir, buf);
-        while let Some(file) = raw_dir.next() {
+        let tasks = spawner.buffered();
+        loop {
+            if raw_dir.is_buffer_empty() {
+                tasks.flush();
+            }
+            let Some(file) = raw_dir.next() else { break };
+
             let file = file.map_io_err(|| format!("Failed to read directory: {from:?}"))?;
             if file.ino() == root_to_inode {
                 // Block recursive descent from parent into child (e.g. cp parent parent/child).
@@ -411,40 +404,40 @@ mod compat {
                 let to = concat_cstrs(&to, file.file_name());
 
                 copy_one_dir(&from_dir, &from, &to)?;
-                maybe_spawn();
-                messages
-                    .send(TreeNode {
-                        from,
-                        to,
-                        root_to_inode,
-                        messages: messages.clone(),
-                    })
-                    .map_err(|_| Error::Internal)?;
-            } else if HARD_LINK {
-                let name = file.file_name();
-                let flags = if follow_symlinks {
-                    AtFlags::SYMLINK_FOLLOW
-                } else {
-                    AtFlags::empty()
+                let node = TreeNode {
+                    from,
+                    to,
+                    root_to_inode,
                 };
-                linkat(&from_dir, name, &to_dir, name, flags).map_io_err(|| {
-                    format!(
-                        "Failed to create symlink: {:?} -> {:?}",
-                        join_cstr_paths(&to, name),
-                        join_cstr_paths(&from, name),
-                    )
-                })?;
+                tasks.spawn_recursive(|spawner, state| copy_dir::<HARD_LINK>(node, state, spawner));
             } else {
-                copy_one_file(
-                    &from_dir,
-                    &to_dir,
-                    file.file_name(),
-                    file_type,
-                    &from,
-                    &to,
-                    symlink_buf_cache,
-                    &mut failed_cross_device,
-                )?;
+                tasks.flush();
+                if HARD_LINK {
+                    let name = file.file_name();
+                    let flags = if follow_symlinks {
+                        AtFlags::SYMLINK_FOLLOW
+                    } else {
+                        AtFlags::empty()
+                    };
+                    linkat(&from_dir, name, &to_dir, name, flags).map_io_err(|| {
+                        format!(
+                            "Failed to create symlink: {:?} -> {:?}",
+                            join_cstr_paths(&to, name),
+                            join_cstr_paths(&from, name),
+                        )
+                    })?;
+                } else {
+                    copy_one_file(
+                        &from_dir,
+                        &to_dir,
+                        file.file_name(),
+                        file_type,
+                        &from,
+                        &to,
+                        symlink_buf_cache,
+                        &mut failed_cross_device,
+                    )?;
+                }
             }
         }
         Ok(())
@@ -454,7 +447,7 @@ mod compat {
         feature = "tracing",
         tracing::instrument(level = "trace", skip(from_dir))
     )]
-    pub fn copy_one_dir(
+    fn copy_one_dir(
         from_dir: impl AsFd,
         from_path: &CString,
         to_path: &CString,
@@ -655,21 +648,11 @@ mod compat {
         Ok(())
     }
 
+    #[derive(Debug)]
     struct TreeNode {
         from: CString,
         to: CString,
         root_to_inode: u64,
-        messages: Sender<Self>,
-    }
-
-    impl Debug for TreeNode {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("TreeNode")
-                .field("from", &self.from)
-                .field("to", &self.to)
-                .field("root_to_inode", &self.root_to_inode)
-                .finish_non_exhaustive()
-        }
     }
 }
 

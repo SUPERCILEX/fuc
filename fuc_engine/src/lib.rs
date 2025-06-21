@@ -3,6 +3,7 @@
 
 use std::{borrow::Cow, io, path::PathBuf};
 
+use lockness_executor::JoinError;
 use thiserror::Error;
 
 pub use crate::ops::{
@@ -21,14 +22,12 @@ pub enum Error {
     },
     #[error("An attempt was made to delete `/`")]
     PreserveRoot,
-    #[error("Failed to join thread")]
-    Join,
+    #[error("Internal error")]
+    Join(JoinError),
     #[error("Invalid file path")]
     BadPath,
     #[error("File or directory already exists: {file:?}")]
     AlreadyExists { file: PathBuf },
     #[error("File or directory not found: {file:?}")]
     NotFound { file: PathBuf },
-    #[error("An internal bug occurred, please report this")]
-    Internal,
 }
