@@ -138,7 +138,7 @@ mod compat {
     use rustix::{
         fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
         io::Errno,
-        thread::{UnshareFlags, unshare},
+        thread::{UnshareFlags, unshare_unsafe},
     };
 
     use crate::{
@@ -190,7 +190,7 @@ mod compat {
 
     fn unshare_io() -> Result<(), Error> {
         if env::var_os("NO_UNSHARE").is_none() {
-            unshare(UnshareFlags::FILES | UnshareFlags::FS)
+            unsafe { unshare_unsafe(UnshareFlags::FILES | UnshareFlags::FS) }
                 .map_io_err(|| "Failed to unshare I/O.")?;
         }
         Ok(())

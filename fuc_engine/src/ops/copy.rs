@@ -184,7 +184,7 @@ mod compat {
             mkdirat, openat, readlinkat, statx, symlinkat,
         },
         io::Errno,
-        thread::{UnshareFlags, unshare},
+        thread::{UnshareFlags, unshare_unsafe},
     };
 
     use crate::{
@@ -252,7 +252,8 @@ mod compat {
 
     fn unshare_files() -> Result<(), Error> {
         if env::var_os("NO_UNSHARE").is_none() {
-            unshare(UnshareFlags::FILES).map_io_err(|| "Failed to unshare FD table.")?;
+            unsafe { unshare_unsafe(UnshareFlags::FILES) }
+                .map_io_err(|| "Failed to unshare FD table.")?;
         }
         Ok(())
     }
