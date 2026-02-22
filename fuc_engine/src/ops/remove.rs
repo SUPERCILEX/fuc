@@ -200,10 +200,8 @@ mod compat {
     fn root_worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         unshare_io()?;
 
-        let mut available_parallelism = thread::available_parallelism()
-            .map(NonZeroUsize::get)
-            .unwrap_or(1)
-            - 1;
+        let mut available_parallelism =
+            thread::available_parallelism().map_or(1, NonZeroUsize::get) - 1;
 
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
@@ -420,8 +418,8 @@ mod compat {
 
     struct TreeNode {
         path: CString,
-        parent: Option<Arc<TreeNode>>,
-        messages: Sender<TreeNode>,
+        parent: Option<Arc<Self>>,
+        messages: Sender<Self>,
     }
 
     impl Debug for TreeNode {

@@ -265,10 +265,8 @@ mod compat {
     ) -> Result<(), Error> {
         unshare_files()?;
 
-        let mut available_parallelism = thread::available_parallelism()
-            .map(NonZeroUsize::get)
-            .unwrap_or(1)
-            - 1;
+        let mut available_parallelism =
+            thread::available_parallelism().map_or(1, NonZeroUsize::get) - 1;
 
         thread::scope(|scope| {
             let mut threads = Vec::with_capacity(available_parallelism);
@@ -661,7 +659,7 @@ mod compat {
         from: CString,
         to: CString,
         root_to_inode: u64,
-        messages: Sender<TreeNode>,
+        messages: Sender<Self>,
     }
 
     impl Debug for TreeNode {

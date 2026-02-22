@@ -169,7 +169,7 @@ fn init_progress() {
         .init();
 }
 
-fn main() -> error_stack::Result<(), CliError> {
+fn main() -> Result<(), Report<CliError>> {
     #[cfg(not(debug_assertions))]
     error_stack::Report::install_debug_hook::<std::panic::Location>(|_, _| {});
 
@@ -183,9 +183,9 @@ fn main() -> error_stack::Result<(), CliError> {
     copy(args).map_err(|e| {
         let wrapper = CliError::Wrapper(format!("{e}"));
         match e {
-            Error::Io { error, context } => Report::from(error)
-                .attach_printable(context)
-                .change_context(wrapper),
+            Error::Io { error, context } => {
+                Report::from(error).attach(context).change_context(wrapper)
+            }
             Error::AlreadyExists { file } => {
                 let report = Report::from(wrapper);
                 match file.symlink_metadata().map(|m| m.is_dir()) {
@@ -193,14 +193,12 @@ fn main() -> error_stack::Result<(), CliError> {
                         let mut file = file.into_os_string();
                         file.push(MAIN_SEPARATOR_STR);
                         report
-                            .attach_printable(format!(
-                                "Use the path {file:?} to copy into the directory."
-                            ))
-                            .attach_printable(
+                            .attach(format!("Use the path {file:?} to copy into the directory."))
+                            .attach(
                                 "Use --force to merge directories (overwriting existing files).",
                             )
                     }
-                    Ok(false) | Err(_) => report.attach_printable("Use --force to overwrite."),
+                    Ok(false) | Err(_) => report.attach("Use --force to overwrite."),
                 }
             }
             Error::Join | Error::BadPath | Error::Internal => Report::from(wrapper),

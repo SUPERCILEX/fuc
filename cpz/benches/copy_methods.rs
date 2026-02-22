@@ -13,7 +13,7 @@ use criterion::{
     criterion_group, criterion_main, measurement::WallTime,
 };
 use memmap2::{Mmap, MmapOptions};
-use rand::{RngCore, rng};
+use rand::{Rng, rng};
 use tempfile::{TempDir, tempdir};
 
 // Don't use an OS backed tempfile since it might change the performance

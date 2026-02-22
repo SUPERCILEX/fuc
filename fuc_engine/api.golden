@@ -20,6 +20,7 @@ impl core::marker::Freeze for fuc_engine::Error
 impl core::marker::Send for fuc_engine::Error
 impl core::marker::Sync for fuc_engine::Error
 impl core::marker::Unpin for fuc_engine::Error
+impl core::marker::UnsafeUnpin for fuc_engine::Error
 impl !core::panic::unwind_safe::RefUnwindSafe for fuc_engine::Error
 impl !core::panic::unwind_safe::UnwindSafe for fuc_engine::Error
 impl<T, U> core::convert::Into<U> for fuc_engine::Error where U: core::convert::From<T>
@@ -53,6 +54,7 @@ impl<'a, 'b, I1, I2, F> core::marker::Freeze for fuc_engine::CopyOp<'a, 'b, I1, 
 impl<'a, 'b, I1, I2, F> core::marker::Send for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::Send, I1: core::marker::Sync, I2: core::marker::Sync
 impl<'a, 'b, I1, I2, F> core::marker::Sync for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::Sync, I1: core::marker::Sync, I2: core::marker::Sync
 impl<'a, 'b, I1, I2, F> core::marker::Unpin for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::Unpin
+impl<'a, 'b, I1, I2, F> core::marker::UnsafeUnpin for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::marker::UnsafeUnpin
 impl<'a, 'b, I1, I2, F> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::panic::unwind_safe::RefUnwindSafe, I1: core::panic::unwind_safe::RefUnwindSafe, I2: core::panic::unwind_safe::RefUnwindSafe
 impl<'a, 'b, I1, I2, F> core::panic::unwind_safe::UnwindSafe for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where F: core::panic::unwind_safe::UnwindSafe, I1: core::panic::unwind_safe::RefUnwindSafe, I2: core::panic::unwind_safe::RefUnwindSafe
 impl<T, U> core::convert::Into<U> for fuc_engine::CopyOp<'a, 'b, I1, I2, F> where U: core::convert::From<T>
@@ -87,6 +89,7 @@ impl<'a, 'b, I1, I2, F, S> core::marker::Freeze for fuc_engine::CopyOpBuilder<'a
 impl<'a, 'b, I1, I2, F, S> core::marker::Send for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Send
 impl<'a, 'b, I1, I2, F, S> core::marker::Sync for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Sync
 impl<'a, 'b, I1, I2, F, S> core::marker::Unpin for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::Unpin
+impl<'a, 'b, I1, I2, F, S> core::marker::UnsafeUnpin for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::marker::UnsafeUnpin
 impl<'a, 'b, I1, I2, F, S> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::panic::unwind_safe::RefUnwindSafe
 impl<'a, 'b, I1, I2, F, S> core::panic::unwind_safe::UnwindSafe for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where F: core::panic::unwind_safe::UnwindSafe
 impl<T, U> core::convert::Into<U> for fuc_engine::CopyOpBuilder<'a, 'b, I1, I2, F, S> where U: core::convert::From<T>
@@ -118,6 +121,7 @@ impl<'a, I, F> core::marker::Freeze for fuc_engine::RemoveOp<'a, I, F> where F: 
 impl<'a, I, F> core::marker::Send for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::Send, I: core::marker::Sync
 impl<'a, I, F> core::marker::Sync for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::Sync, I: core::marker::Sync
 impl<'a, I, F> core::marker::Unpin for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::Unpin
+impl<'a, I, F> core::marker::UnsafeUnpin for fuc_engine::RemoveOp<'a, I, F> where F: core::marker::UnsafeUnpin
 impl<'a, I, F> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::RemoveOp<'a, I, F> where F: core::panic::unwind_safe::RefUnwindSafe, I: core::panic::unwind_safe::RefUnwindSafe
 impl<'a, I, F> core::panic::unwind_safe::UnwindSafe for fuc_engine::RemoveOp<'a, I, F> where F: core::panic::unwind_safe::UnwindSafe, I: core::panic::unwind_safe::RefUnwindSafe
 impl<T, U> core::convert::Into<U> for fuc_engine::RemoveOp<'a, I, F> where U: core::convert::From<T>
@@ -150,6 +154,7 @@ impl<'a, I, F, S> core::marker::Freeze for fuc_engine::RemoveOpBuilder<'a, I, F,
 impl<'a, I, F, S> core::marker::Send for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Send
 impl<'a, I, F, S> core::marker::Sync for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Sync
 impl<'a, I, F, S> core::marker::Unpin for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::Unpin
+impl<'a, I, F, S> core::marker::UnsafeUnpin for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::marker::UnsafeUnpin
 impl<'a, I, F, S> core::panic::unwind_safe::RefUnwindSafe for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::panic::unwind_safe::RefUnwindSafe
 impl<'a, I, F, S> core::panic::unwind_safe::UnwindSafe for fuc_engine::RemoveOpBuilder<'a, I, F, S> where F: core::panic::unwind_safe::UnwindSafe
 impl<T, U> core::convert::Into<U> for fuc_engine::RemoveOpBuilder<'a, I, F, S> where U: core::convert::From<T>
