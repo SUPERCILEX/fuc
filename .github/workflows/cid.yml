@@ -112,7 +112,9 @@ jobs:
         if: contains(matrix.tool, 'cross')
         run: cargo install cross
       - name: Build binary
-        run: RUSTFLAGS="-C panic=immediate-abort -Z unstable-options" ${{ matrix.tool }} build --workspace --release --locked --target=${{ matrix.target }} -Z build-std=std,panic_abort
+        run: ${{ matrix.tool }} build --workspace --release --locked --target=${{ matrix.target }} -Z build-std=std,panic_abort
+        env:
+          RUSTFLAGS: -C panic=immediate-abort -Z unstable-options
       - name: Upload binary
         if: matrix.os != 'windows-latest'
         uses: svenstaro/upload-release-action@v2
