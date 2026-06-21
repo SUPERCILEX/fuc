@@ -736,16 +736,26 @@ mod compat {
         hard_link: bool,
         root_to_inode: u64,
     ) -> Result<(), io::Error> {
+        let from = from.as_ref();
         let to = to.as_ref();
-        match fs::create_dir(to) {
+        match {
+            let mut builder = fs::DirBuilder::new();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+
+                let from_metadata = from.symlink_metadata()?;
+                builder.mode(from_metadata.mode());
+            }
+            builder.create(to)
+        } {
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
             r => r?,
         }
         #[cfg(not(unix))]
         let _ = root_to_inode;
 
-        from.as_ref()
-            .read_dir()?
+        from.read_dir()?
             .par_bridge()
             .try_for_each(|dir_entry| -> io::Result<()> {
                 let dir_entry = dir_entry?;
