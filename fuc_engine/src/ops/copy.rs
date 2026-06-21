@@ -410,7 +410,7 @@ mod compat {
                 let from = concat_cstrs(&from, file.file_name());
                 let to = concat_cstrs(&to, file.file_name());
 
-                copy_one_dir(&from_dir, &from, &to)?;
+                copy_one_dir(&from, &to)?;
                 maybe_spawn();
                 messages
                     .send(TreeNode {
@@ -450,17 +450,10 @@ mod compat {
         Ok(())
     }
 
-    #[cfg_attr(
-        feature = "tracing",
-        tracing::instrument(level = "trace", skip(from_dir))
-    )]
-    pub fn copy_one_dir(
-        from_dir: impl AsFd,
-        from_path: &CString,
-        to_path: &CString,
-    ) -> Result<(), Error> {
+    #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
+    pub fn copy_one_dir(from_path: &CString, to_path: &CString) -> Result<(), Error> {
         let from_mode = {
-            let from_metadata = statx(from_dir, c"", AtFlags::EMPTY_PATH, StatxFlags::MODE)
+            let from_metadata = statx(CWD, from_path, AtFlags::EMPTY_PATH, StatxFlags::MODE)
                 .map_io_err(|| format!("Failed to stat directory: {from_path:?}"))?;
             Mode::from_raw_mode(from_metadata.stx_mode.into())
         };

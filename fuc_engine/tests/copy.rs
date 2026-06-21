@@ -229,7 +229,7 @@ fn preserve_directory_permissions_recursive() {
         .unwrap();
 
     let metadata = fs::metadata(&to_subdir).unwrap();
-    assert_eq!(metadata.permissions().mode() & 0o777, 0o775);
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o750);
 }
 
 #[rstest]
