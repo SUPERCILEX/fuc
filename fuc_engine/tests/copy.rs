@@ -146,6 +146,92 @@ fn symbolic_link_copy_link() {
     assert!(to.exists());
 }
 
+#[test]
+#[cfg(unix)]
+fn preserve_root_file_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    File::create(&from).unwrap();
+    fs::set_permissions(&from, fs::Permissions::from_mode(0o644)).unwrap();
+
+    let to = root.path().join("to");
+
+    fuc_engine::copy_file(&from, &to).unwrap();
+
+    let metadata = fs::metadata(&to).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
+}
+
+#[test]
+#[cfg(unix)]
+fn preserve_root_directory_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    fs::set_permissions(&from, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let to = root.path().join("to");
+
+    fuc_engine::copy_file(&from, &to).unwrap();
+
+    let metadata = fs::metadata(&to).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o755);
+}
+
+#[test]
+#[cfg(unix)]
+fn preserve_file_permissions_in_dir() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    let from_file = from.join("file.txt");
+    fs::create_dir(&from).unwrap();
+    File::create(&from_file).unwrap();
+    fs::set_permissions(&from_file, fs::Permissions::from_mode(0o644)).unwrap();
+
+    let to = root.path().join("to");
+    let to_file = to.join("file.txt");
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Owned(to))])
+        .build()
+        .run()
+        .unwrap();
+
+    let metadata = fs::metadata(&to_file).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o644);
+}
+
+#[test]
+#[cfg(unix)]
+fn preserve_directory_permissions_recursive() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    let subdir = from.join("subdir");
+    fs::create_dir(&from).unwrap();
+    fs::create_dir(&subdir).unwrap();
+    fs::set_permissions(&subdir, fs::Permissions::from_mode(0o750)).unwrap();
+
+    let to = root.path().join("to");
+    let to_subdir = to.join("subdir");
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Owned(to))])
+        .build()
+        .run()
+        .unwrap();
+
+    let metadata = fs::metadata(&to_subdir).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o775);
+}
+
 #[rstest]
 #[cfg(unix)]
 fn dereference_symbolic_link_to_regular_file(#[values(false, true)] follow_symlinks: bool) {
