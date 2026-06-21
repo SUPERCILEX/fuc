@@ -732,6 +732,7 @@ mod compat {
         let from = from.as_ref();
         let to = to.as_ref();
         match {
+            #[cfg_attr(not(unix), allow(unused_mut))]
             let mut builder = fs::DirBuilder::new();
             #[cfg(unix)]
             {
