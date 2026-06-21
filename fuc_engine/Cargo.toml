@@ -10,7 +10,7 @@ categories = ["filesystem"]
 license.workspace = true
 
 [dependencies]
-bon = "3.9.0"
+bon = "3.9.3"
 crossbeam-channel = "0.5.15"
 thiserror = "2.0.18"
 tracing = { version = "0.1.44", default-features = false, features = ["attributes"], optional = true }
@@ -19,7 +19,7 @@ tracing = { version = "0.1.44", default-features = false, features = ["attribute
 rustix = { version = "1.1.4", features = ["fs", "thread", "linux_latest"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-rayon = "1.11.0"
+rayon = "1.12.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 remove_dir_all = { version = "1.0.0", features = ["parallel"] }
@@ -28,5 +28,5 @@ remove_dir_all = { version = "1.0.0", features = ["parallel"] }
 ftzz = "4.0.0"
 io-adapters = "0.4.0"
 rstest = { version = "0.26.1", default-features = false }
-supercilex-tests = { version = "0.4.21", default-features = false, features = ["api"] }
-tempfile = "3.25.0"
+supercilex-tests = { version = "0.4.22", default-features = false, features = ["api"] }
+tempfile = "3.27.0"

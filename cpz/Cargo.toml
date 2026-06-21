@@ -10,14 +10,14 @@ categories = ["command-line-utilities", "development-tools", "filesystem"]
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.60", features = ["derive", "wrap_help"] }
-error-stack = { version = "0.6.0", default-features = false, features = ["std"] }
+clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
+error-stack = { version = "0.7.1", default-features = false, features = ["std"] }
 fuc_engine = { version = "1", path = "../fuc_engine" }
 indicatif = { version = "0.18.4", optional = true }
 thiserror = "2.0.18"
 tracing = { version = "0.1.44", optional = true }
 tracing-indicatif = { version = "0.3.14", optional = true }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"], optional = true }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"], optional = true }
 tracing-tracy = { version = "0.11.4", features = ["flush-on-exit"], optional = true }
 tracy-client = { version = "0.18.4", optional = true }
 
@@ -25,10 +25,10 @@ tracy-client = { version = "0.18.4", optional = true }
 cache-size = "0.7.0"
 criterion = "0.8.2"
 memmap2 = "0.9.10"
-rand = "0.10.0"
-supercilex-tests = { version = "0.4.21", default-features = false, features = ["clap"] }
-tempfile = "3.25.0"
-trycmd = "1.0.0"
+rand = "0.10.1"
+supercilex-tests = { version = "0.4.22", default-features = false, features = ["clap"] }
+tempfile = "3.27.0"
+trycmd = "1.2.0"
 
 [target.'cfg(unix)'.dev-dependencies]
 rustix = { version = "1.1.4", features = ["fs", "pipe"] }
