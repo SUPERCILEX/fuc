@@ -11,7 +11,7 @@ license.workspace = true
 
 [dependencies]
 bon = "3.9.3"
-crossbeam-channel = "0.5.15"
+crossbeam-channel = "0.5.16"
 thiserror = "2.0.18"
 tracing = { version = "0.1.44", default-features = false, features = ["attributes"], optional = true }
 

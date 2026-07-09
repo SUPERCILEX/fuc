@@ -11,9 +11,9 @@ license.workspace = true
 
 [dependencies]
 clap = { version = "4.6.1", features = ["derive", "wrap_help"] }
-error-stack = { version = "0.7.1", default-features = false, features = ["std"] }
+error-stack = { version = "0.8.0", default-features = false, features = ["std"] }
 fuc_engine = { version = "1", path = "../fuc_engine" }
-indicatif = { version = "0.18.4", optional = true }
+indicatif = { version = "0.18.6", optional = true }
 thiserror = "2.0.18"
 tracing = { version = "0.1.44", optional = true }
 tracing-indicatif = { version = "0.3.14", optional = true }

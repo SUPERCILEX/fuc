@@ -272,6 +272,7 @@ mod compat {
             let mut threads = Vec::with_capacity(available_parallelism);
 
             {
+                #[allow(clippy::large_stack_arrays)]
                 let mut buf = [MaybeUninit::<u8>::uninit(); 32768];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
@@ -317,6 +318,7 @@ mod compat {
     ) -> Result<(), Error> {
         unshare_files()?;
 
+        #[allow(clippy::large_stack_arrays)]
         let mut buf = [MaybeUninit::<u8>::uninit(); 32768];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
