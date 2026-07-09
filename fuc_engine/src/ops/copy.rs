@@ -272,7 +272,7 @@ mod compat {
             let mut threads = Vec::with_capacity(available_parallelism);
 
             {
-                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+                let mut buf = [MaybeUninit::<u8>::uninit(); 32768];
                 let symlink_buf_cache = Cell::new(Vec::new());
                 for node in &tasks {
                     let mut maybe_spawn = || {
@@ -317,7 +317,7 @@ mod compat {
     ) -> Result<(), Error> {
         unshare_files()?;
 
-        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+        let mut buf = [MaybeUninit::<u8>::uninit(); 32768];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
             copy_dir::<HARD_LINK>(node, follow_symlinks, &mut buf, &symlink_buf_cache, || {})?;

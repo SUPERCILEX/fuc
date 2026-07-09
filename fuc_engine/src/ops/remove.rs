@@ -124,11 +124,15 @@ mod compat {
         fs,
         mem::MaybeUninit,
         num::NonZeroUsize,
+        ops::{Deref, DerefMut},
         os::{
             fd::{AsFd, OwnedFd},
             unix::ffi::OsStrExt,
         },
         path::{Path, PathBuf},
+        ptr,
+        ptr::NonNull,
+        slice,
         sync::Arc,
         thread,
         thread::JoinHandle,
@@ -138,6 +142,7 @@ mod compat {
     use rustix::{
         fs::{AtFlags, CWD, FileType, Mode, OFlags, RawDir, openat, unlinkat},
         io::Errno,
+        mm::{MapFlags, ProtFlags, mmap_anonymous, munmap},
         thread::{UnshareFlags, unshare_unsafe},
     };
 
@@ -188,6 +193,50 @@ mod compat {
         }
     }
 
+    #[derive(Debug)]
+    pub struct DirBuf {
+        ptr: NonNull<u8>,
+        len: usize,
+    }
+
+    impl DirBuf {
+        pub fn new() -> rustix::io::Result<Self> {
+            let len = 16 * (1 << 20);
+            Ok(Self {
+                ptr: unsafe {
+                    NonNull::new_unchecked(mmap_anonymous(
+                        ptr::null_mut(),
+                        len,
+                        ProtFlags::READ | ProtFlags::WRITE,
+                        MapFlags::PRIVATE | MapFlags::NORESERVE,
+                    )?)
+                }
+                .cast(),
+                len,
+            })
+        }
+    }
+
+    impl Deref for DirBuf {
+        type Target = [MaybeUninit<u8>];
+
+        fn deref(&self) -> &[MaybeUninit<u8>] {
+            unsafe { slice::from_raw_parts(self.ptr.as_ptr().cast(), self.len) }
+        }
+    }
+
+    impl DerefMut for DirBuf {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr().cast(), self.len) }
+        }
+    }
+
+    impl Drop for DirBuf {
+        fn drop(&mut self) {
+            let _ = unsafe { munmap(self.ptr.as_ptr().cast(), self.len) };
+        }
+    }
+
     fn unshare_io() -> Result<(), Error> {
         if env::var_os("NO_UNSHARE").is_none() {
             unsafe { unshare_unsafe(UnshareFlags::FILES | UnshareFlags::FS) }
@@ -207,7 +256,7 @@ mod compat {
             let mut threads = Vec::with_capacity(available_parallelism);
 
             {
-                let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+                let mut buf = DirBuf::new().map_io_err(|| "Failed to allocate dir buf.")?;
                 for message in &tasks {
                     let mut maybe_spawn = || {
                         if available_parallelism > 0 && !tasks.is_empty() {
@@ -242,7 +291,7 @@ mod compat {
     fn worker_thread(tasks: Receiver<TreeNode>) -> Result<(), Error> {
         unshare_io()?;
 
-        let mut buf = [MaybeUninit::<u8>::uninit(); 8192];
+        let mut buf = DirBuf::new().map_io_err(|| "Failed to allocate dir buf.")?;
         for message in tasks {
             delete_dir(message, &mut buf, || {})?;
         }
