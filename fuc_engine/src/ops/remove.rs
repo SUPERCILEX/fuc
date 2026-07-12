@@ -303,19 +303,30 @@ mod compat {
         tracing::instrument(level = "info", skip(buf, maybe_spawn))
     )]
     fn delete_dir(
-        node: TreeNode,
+        mut node: TreeNode,
         buf: &mut [MaybeUninit<u8>],
-        maybe_spawn: impl FnMut(),
+        mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
-        let dir = openat(
-            CWD,
-            &node.path,
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
-            Mode::empty(),
-        )
-        .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
-        let node = delete_dir_contents(node, dir, buf, maybe_spawn)?;
-        delete_empty_dir_chain(node)
+        // This retry loop is pretty cursed. All popular Linux file systems handle
+        // getdents64 and unlink interleavings correctly, but it's technically not POSIX
+        // compliant and thus can fail. We catch the failures by hanlding directory
+        // NOTEMPTY errors.
+        let mut attempts = 0;
+        loop {
+            let dir = openat(
+                CWD,
+                &node.path,
+                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW,
+                Mode::empty(),
+            )
+            .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
+            let node_ = delete_dir_contents(node, dir, buf, &mut maybe_spawn)?;
+            match delete_empty_dir_chain(node_, attempts < 4096)? {
+                UnlinkDirOutcome::Ok => return Ok(()),
+                UnlinkDirOutcome::DirNotEmpty(node_) => node = node_,
+            }
+            attempts += 1;
+        }
     }
 
     #[cfg_attr(
@@ -409,22 +420,34 @@ mod compat {
         Ok(Arcable::into_inner(node))
     }
 
+    enum UnlinkDirOutcome {
+        Ok,
+        DirNotEmpty(TreeNode),
+    }
+
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
-    fn delete_empty_dir_chain(mut node: Option<TreeNode>) -> Result<(), Error> {
+    fn delete_empty_dir_chain(
+        mut node: Option<TreeNode>,
+        surface_dir_not_empty_errors: bool,
+    ) -> Result<UnlinkDirOutcome, Error> {
         let mut result = Ok(());
-        while let Some(TreeNode {
-            ref path,
-            parent,
-            messages: _,
-        }) = node
-        {
+        while let Some(node_) = node {
             if result.is_ok() {
-                result = unlinkat(CWD, path, AtFlags::REMOVEDIR)
-                    .map_io_err(|| format!("Failed to delete directory: {path:?}"));
+                // We don't use ? here and also don't break out of the loop so that we continue
+                // to drain the linked list without overflowing the drop stack
+                match unlinkat(CWD, &node_.path, AtFlags::REMOVEDIR) {
+                    Err(Errno::NOTEMPTY) if surface_dir_not_empty_errors => {
+                        return Ok(UnlinkDirOutcome::DirNotEmpty(node_));
+                    }
+                    r => {
+                        result = r
+                            .map_io_err(|| format!("Failed to delete directory: {:?}", node_.path));
+                    }
+                }
             }
-            node = parent.and_then(Arc::into_inner);
+            node = node_.parent.and_then(Arc::into_inner);
         }
-        result
+        result.map(|()| UnlinkDirOutcome::Ok)
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "debug", skip(dir)))]
