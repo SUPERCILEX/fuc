@@ -311,7 +311,6 @@ mod compat {
         // getdents64 and unlink interleavings correctly, but it's technically not POSIX
         // compliant and thus can fail. We catch the failures by hanlding directory
         // NOTEMPTY errors.
-        let mut attempts = 0;
         loop {
             let dir = openat(
                 CWD,
@@ -321,11 +320,10 @@ mod compat {
             )
             .map_io_err(|| format!("Failed to open directory: {:?}", node.path))?;
             let node_ = delete_dir_contents(node, dir, buf, &mut maybe_spawn)?;
-            match delete_empty_dir_chain(node_, attempts < 4096)? {
+            match delete_empty_dir_chain(node_)? {
                 UnlinkDirOutcome::Ok => return Ok(()),
                 UnlinkDirOutcome::DirNotEmpty(node_) => node = node_,
             }
-            attempts += 1;
         }
     }
 
@@ -426,17 +424,14 @@ mod compat {
     }
 
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace"))]
-    fn delete_empty_dir_chain(
-        mut node: Option<TreeNode>,
-        surface_dir_not_empty_errors: bool,
-    ) -> Result<UnlinkDirOutcome, Error> {
+    fn delete_empty_dir_chain(mut node: Option<TreeNode>) -> Result<UnlinkDirOutcome, Error> {
         let mut result = Ok(());
         while let Some(node_) = node {
             if result.is_ok() {
                 // We don't use ? here and also don't break out of the loop so that we continue
                 // to drain the linked list without overflowing the drop stack
                 match unlinkat(CWD, &node_.path, AtFlags::REMOVEDIR) {
-                    Err(Errno::NOTEMPTY) if surface_dir_not_empty_errors => {
+                    Err(Errno::NOTEMPTY) => {
                         return Ok(UnlinkDirOutcome::DirNotEmpty(node_));
                     }
                     r => {
