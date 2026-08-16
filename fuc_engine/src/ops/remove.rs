@@ -390,7 +390,7 @@ mod compat {
                 }
             }
 
-            if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes() > 4096
+            if node.as_ref().path.as_bytes_with_nul().len() + file.file_name().count_bytes() >= 4096
             {
                 long_path_fallback_deletion(&node.as_ref().path, file.file_name())?;
                 continue;
