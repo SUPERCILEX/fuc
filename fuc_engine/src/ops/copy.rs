@@ -429,9 +429,48 @@ mod compat {
                 } else {
                     AtFlags::empty()
                 };
-                linkat(&from_dir, name, &to_dir, name, flags).map_io_err(|| {
+                match linkat(&from_dir, name, &to_dir, name, flags) {
+                    Err(Errno::EXIST) => {
+                        let id = |dir: &OwnedFd, dir_name| {
+                            let metadata = statx(
+                                dir,
+                                name,
+                                if follow_symlinks {
+                                    AtFlags::empty()
+                                } else {
+                                    AtFlags::SYMLINK_NOFOLLOW
+                                },
+                                StatxFlags::INO,
+                            )
+                            .map_io_err(|| {
+                                format!(
+                                    "Failed to stat file: {:?}",
+                                    join_cstr_paths(dir_name, name)
+                                )
+                            })?;
+                            Ok::<_, Error>((
+                                metadata.stx_ino,
+                                metadata.stx_dev_minor,
+                                metadata.stx_dev_major,
+                            ))
+                        };
+                        let from_id = id(&from_dir, &from)?;
+                        let to_id = id(&to_dir, &to)?;
+
+                        // We add this check to handle NFSv3 nonsense. If you drop the response
+                        // packet that says the hardlink suceeded, then you'll get back an EXIST
+                        // even though the hardlink suceeded.
+                        if from_id == to_id {
+                            Ok(())
+                        } else {
+                            Err(Errno::EXIST)
+                        }
+                    }
+                    r => r,
+                }
+                .map_io_err(|| {
                     format!(
-                        "Failed to create symlink: {:?} -> {:?}",
+                        "Failed to create hard link: {:?} -> {:?}",
                         join_cstr_paths(&to, name),
                         join_cstr_paths(&from, name),
                     )
