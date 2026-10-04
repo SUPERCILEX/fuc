@@ -392,7 +392,8 @@ mod compat {
         while let Some(file) = raw_dir.next() {
             let file = file.map_io_err(|| format!("Failed to read directory: {from:?}"))?;
             if file.ino() == root_to_inode {
-                // Block recursive descent from parent into child (e.g. cp parent parent/child).
+                // Block recursive descent from parent into child
+                // (e.g. cp parent parent/child).
                 continue;
             }
             {
@@ -457,9 +458,10 @@ mod compat {
                         let from_id = id(&from_dir, &from)?;
                         let to_id = id(&to_dir, &to)?;
 
-                        // We add this check to handle NFSv3 nonsense. If you drop the response
-                        // packet that says the hardlink suceeded, then you'll get back an EXIST
-                        // even though the hardlink suceeded.
+                        // We add this check to handle NFSv3 nonsense. If you
+                        // drop the response packet that says the hardlink
+                        // succeeded, then you'll get back an EXIST even though
+                        // the hardlink succeeded.
                         if from_id == to_id {
                             Ok(())
                         } else {

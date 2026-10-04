@@ -360,7 +360,8 @@ fn add_benches(group: &mut BenchmarkGroup<WallTime>, num_bytes: u64, direct_io: 
 
                         results.push(thread::spawn(move || {
                             let mut buf = Vec::with_capacity(usize::try_from(chunk_size).unwrap());
-                            // We write those bytes immediately after and dropping u8s does nothing
+                            // We write those bytes immediately after and
+                            // dropping u8s does nothing
                             #[allow(clippy::uninit_vec)]
                             unsafe {
                                 buf.set_len(usize::try_from(chunk_size).unwrap());

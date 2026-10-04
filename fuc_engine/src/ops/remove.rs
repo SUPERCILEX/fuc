@@ -307,10 +307,10 @@ mod compat {
         buf: &mut [MaybeUninit<u8>],
         mut maybe_spawn: impl FnMut(),
     ) -> Result<(), Error> {
-        // This retry loop is pretty cursed. All popular Linux file systems handle
-        // getdents64 and unlink interleavings correctly, but it's technically not POSIX
-        // compliant and thus can fail. We catch the failures by hanlding directory
-        // NOTEMPTY errors.
+        // This retry loop is pretty cursed. All popular Linux file systems
+        // handle getdents64 and unlink interleavings correctly, but
+        // it's technically not POSIX compliant and thus can fail. We
+        // catch the failures by hanlding directory NOTEMPTY errors.
         loop {
             let dir = openat(
                 CWD,
@@ -428,8 +428,9 @@ mod compat {
         let mut result = Ok(());
         while let Some(node_) = node {
             if result.is_ok() {
-                // We don't use ? here and also don't break out of the loop so that we continue
-                // to drain the linked list without overflowing the drop stack
+                // We don't use ? here and also don't break out of the loop so
+                // that we continue to drain the linked list
+                // without overflowing the drop stack
                 match unlinkat(CWD, &node_.path, AtFlags::REMOVEDIR) {
                     Err(Errno::NOTEMPTY) => {
                         return Ok(UnlinkDirOutcome::DirNotEmpty(node_));
