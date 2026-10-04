@@ -43,7 +43,7 @@ struct Cpz {
 
     /// Follow symlinks in the files to be copied rather than copying the
     /// symlinks themselves
-    #[arg(short = 'L', long, default_value_t = false)]
+    #[arg(short = 'L', long)]
     #[arg(aliases = ["follow-symlinks"])]
     // Ensure we don't try to create symlinks by default as doing so is considered a privileged
     // operation: https://doc.rust-lang.org/std/os/windows/fs/fn.symlink_file.html#limitations
