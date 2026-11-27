@@ -318,3 +318,100 @@ fn dereference_symbolic_link_to_dir_in_dir(#[values(false, true)] follow_symlink
         );
     }
 }
+
+#[test]
+#[cfg(unix)]
+fn pre_existing_symlink_force() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    std::os::unix::fs::symlink("new_target", &from).unwrap();
+    let to = root.path().join("to");
+    std::os::unix::fs::symlink("old_target", &to).unwrap();
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        fs::read_link(&to).unwrap(),
+        std::path::Path::new("new_target")
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn pre_existing_symlink_in_dir_force() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    std::os::unix::fs::symlink("new_target", from.join("link")).unwrap();
+    let to = root.path().join("to");
+    fs::create_dir(&to).unwrap();
+    std::os::unix::fs::symlink("old_target", to.join("link")).unwrap();
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        fs::read_link(to.join("link")).unwrap(),
+        std::path::Path::new("new_target")
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn pre_existing_file_overwritten_by_symlink_in_dir_force() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    std::os::unix::fs::symlink("target", from.join("item")).unwrap();
+    let to = root.path().join("to");
+    fs::create_dir(&to).unwrap();
+    File::create(to.join("item")).unwrap();
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap();
+
+    assert!(to.join("item").symlink_metadata().unwrap().is_symlink());
+    assert_eq!(
+        fs::read_link(to.join("item")).unwrap(),
+        std::path::Path::new("target")
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn pre_existing_dir_not_overwritten_by_symlink_in_dir_force() {
+    let root = tempdir().unwrap();
+    let from = root.path().join("from");
+    fs::create_dir(&from).unwrap();
+    std::os::unix::fs::symlink("target", from.join("item")).unwrap();
+    let to = root.path().join("to");
+    fs::create_dir(&to).unwrap();
+    fs::create_dir(to.join("item")).unwrap();
+
+    fuc_engine::CopyOp::builder()
+        .files([(Cow::Owned(from), Cow::Borrowed(to.as_path()))])
+        .force(true)
+        .build()
+        .run()
+        .unwrap_err();
+
+    assert!(to.join("item").symlink_metadata().unwrap().is_dir());
+    let entries: Vec<_> = fs::read_dir(&to)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(entries, vec![std::ffi::OsString::from("item")]);
+}

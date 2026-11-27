@@ -1,4 +1,13 @@
-use std::{borrow::Cow, fmt::Debug, fs, io, marker::PhantomData, path::Path};
+use std::{
+    borrow::Cow,
+    fmt::Debug,
+    fs, io,
+    marker::PhantomData,
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+static TMP_SYMLINK_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 use bon::Builder;
 
@@ -54,7 +63,7 @@ impl<
     ///
     /// Returns the underlying I/O errors that occurred.
     pub fn run(self) -> Result<(), Error> {
-        let copy = compat::copy_impl(self.follow_symlinks, self.hard_link);
+        let copy = compat::copy_impl(self.force, self.follow_symlinks, self.hard_link);
         let result = schedule_copies(self, &copy);
         copy.finish().and(result)
     }
@@ -181,7 +190,7 @@ mod compat {
     use rustix::{
         fs::{
             AtFlags, CWD, FileType, Mode, OFlags, RawDir, StatxFlags, copy_file_range, linkat,
-            mkdirat, openat, readlinkat, statx, symlinkat,
+            mkdirat, openat, readlinkat, renameat, statx, symlinkat, unlinkat,
         },
         io::Errno,
         thread::{UnshareFlags, unshare_unsafe},
@@ -189,7 +198,13 @@ mod compat {
 
     use crate::{
         Error,
-        ops::{IoErr, compat::DirectoryOp, concat_cstrs, join_cstr_paths, path_buf_to_cstring},
+        ops::{
+            IoErr,
+            compat::DirectoryOp,
+            concat_cstrs,
+            copy::{Ordering, TMP_SYMLINK_COUNTER},
+            join_cstr_paths, path_buf_to_cstring,
+        },
     };
 
     struct Impl<LF: FnOnce() -> (Sender<TreeNode>, JoinHandle<Result<(), Error>>)> {
@@ -197,6 +212,7 @@ mod compat {
     }
 
     pub fn copy_impl<'a, 'b>(
+        force: bool,
         follow_symlinks: bool,
         hard_link: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
@@ -205,9 +221,9 @@ mod compat {
             (
                 tx,
                 if hard_link {
-                    thread::spawn(move || root_worker_thread::<true>(rx, follow_symlinks))
+                    thread::spawn(move || root_worker_thread::<true>(rx, force, follow_symlinks))
                 } else {
-                    thread::spawn(move || root_worker_thread::<false>(rx, follow_symlinks))
+                    thread::spawn(move || root_worker_thread::<false>(rx, force, follow_symlinks))
                 },
             )
         });
@@ -261,6 +277,7 @@ mod compat {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn root_worker_thread<const HARD_LINK: bool>(
         tasks: Receiver<TreeNode>,
+        force: bool,
         follow_symlinks: bool,
     ) -> Result<(), Error> {
         unshare_files()?;
@@ -288,7 +305,7 @@ mod compat {
                             available_parallelism -= 1;
                             threads.push(scope.spawn({
                                 let tasks = tasks.clone();
-                                move || worker_thread::<HARD_LINK>(tasks, follow_symlinks)
+                                move || worker_thread::<HARD_LINK>(tasks, force, follow_symlinks)
                             }));
                         }
                     };
@@ -296,6 +313,7 @@ mod compat {
 
                     copy_dir::<HARD_LINK>(
                         node,
+                        force,
                         follow_symlinks,
                         &mut buf,
                         &symlink_buf_cache,
@@ -314,6 +332,7 @@ mod compat {
     #[cfg_attr(feature = "tracing", tracing::instrument(level = "trace", skip(tasks)))]
     fn worker_thread<const HARD_LINK: bool>(
         tasks: Receiver<TreeNode>,
+        force: bool,
         follow_symlinks: bool,
     ) -> Result<(), Error> {
         unshare_files()?;
@@ -322,7 +341,14 @@ mod compat {
         let mut buf = [MaybeUninit::<u8>::uninit(); 32768];
         let symlink_buf_cache = Cell::new(Vec::new());
         for node in tasks {
-            copy_dir::<HARD_LINK>(node, follow_symlinks, &mut buf, &symlink_buf_cache, || {})?;
+            copy_dir::<HARD_LINK>(
+                node,
+                force,
+                follow_symlinks,
+                &mut buf,
+                &symlink_buf_cache,
+                || {},
+            )?;
         }
         Ok(())
     }
@@ -361,6 +387,7 @@ mod compat {
             root_to_inode,
             messages,
         }: TreeNode,
+        force: bool,
         follow_symlinks: bool,
         buf: &mut [MaybeUninit<u8>],
         symlink_buf_cache: &Cell<Vec<u8>>,
@@ -487,6 +514,7 @@ mod compat {
                     &to,
                     symlink_buf_cache,
                     &mut failed_cross_device,
+                    force,
                 )?;
             }
         }
@@ -521,6 +549,7 @@ mod compat {
         to_path: &CString,
         symlink_buf_cache: &Cell<Vec<u8>>,
         failed_cross_device: &mut bool,
+        force: bool,
     ) -> Result<(), Error> {
         if file_type == FileType::Symlink {
             copy_symlink(
@@ -530,6 +559,7 @@ mod compat {
                 from_path,
                 to_path,
                 symlink_buf_cache,
+                force,
             )
         } else {
             let (from, to, from_size) =
@@ -671,6 +701,7 @@ mod compat {
         from_path: &CString,
         to_path: &CString,
         symlink_buf_cache: &Cell<Vec<u8>>,
+        force: bool,
     ) -> Result<(), Error> {
         let from_symlink =
             readlinkat(from_dir, file_name, symlink_buf_cache.take()).map_io_err(|| {
@@ -680,7 +711,30 @@ mod compat {
                 )
             })?;
 
-        symlinkat(&from_symlink, &to_dir, file_name).map_io_err(|| {
+        let create_result = match symlinkat(&from_symlink, &to_dir, file_name) {
+            Err(Errno::EXIST) if force => (|| -> Result<(), Errno> {
+                let tmp_name = loop {
+                    let candidate = CString::new(format!(
+                        ".fuc-symlink-{}-{}",
+                        std::process::id(),
+                        TMP_SYMLINK_COUNTER.fetch_add(1, Ordering::Relaxed),
+                    ))
+                    .unwrap();
+                    match symlinkat(&from_symlink, &to_dir, &candidate) {
+                        Err(Errno::EXIST) => continue,
+                        Ok(()) => break candidate,
+                        Err(e) => return Err(e),
+                    }
+                };
+                if let Err(e) = renameat(&to_dir, &tmp_name, &to_dir, file_name) {
+                    let _ = unlinkat(&to_dir, &tmp_name, AtFlags::empty());
+                    return Err(e);
+                }
+                Ok(())
+            })(),
+            r => r,
+        };
+        create_result.map_io_err(|| {
             format!(
                 "Failed to create symlink: {:?} -> {from_symlink:?}",
                 join_cstr_paths(to_path, file_name),
@@ -717,19 +771,26 @@ mod compat {
 
     use crate::{
         Error,
-        ops::{IoErr, compat::DirectoryOp},
+        ops::{
+            IoErr,
+            compat::DirectoryOp,
+            copy::{Ordering, TMP_SYMLINK_COUNTER},
+        },
     };
 
     struct Impl {
+        force: bool,
         follow_symlinks: bool,
         hard_link: bool,
     }
 
     pub fn copy_impl<'a, 'b>(
+        force: bool,
         follow_symlinks: bool,
         hard_link: bool,
     ) -> impl DirectoryOp<(Cow<'a, Path>, Cow<'b, Path>)> {
         Impl {
+            force,
             follow_symlinks,
             hard_link,
         }
@@ -751,6 +812,7 @@ mod compat {
             copy_dir(
                 &from,
                 to,
+                self.force,
                 self.follow_symlinks,
                 self.hard_link,
                 root_to_inode,
@@ -768,6 +830,7 @@ mod compat {
     fn copy_dir<P: AsRef<Path> + Debug, Q: AsRef<Path> + Debug>(
         from: P,
         to: Q,
+        force: bool,
         follow_symlinks: bool,
         hard_link: bool,
         root_to_inode: u64,
@@ -817,6 +880,7 @@ mod compat {
                     copy_dir(
                         dir_entry.path(),
                         to,
+                        force,
                         follow_symlinks,
                         hard_link,
                         root_to_inode,
@@ -826,13 +890,39 @@ mod compat {
                     if hard_link {
                         fs::hard_link(dir_entry.path(), to)?;
                     } else {
-                        #[cfg(unix)]
-                        std::os::unix::fs::symlink(from, to)?;
-                        #[cfg(windows)]
-                        if fs::metadata(&from)?.file_type().is_dir() {
-                            std::os::windows::fs::symlink_dir(from, to)?;
-                        } else {
-                            std::os::windows::fs::symlink_file(from, to)?;
+                        let create_symlink = |dst: &Path| -> io::Result<()> {
+                            #[cfg(unix)]
+                            return std::os::unix::fs::symlink(&from, dst);
+                            #[cfg(windows)]
+                            if fs::metadata(&from)?.file_type().is_dir() {
+                                std::os::windows::fs::symlink_dir(&from, dst)
+                            } else {
+                                std::os::windows::fs::symlink_file(&from, dst)
+                            }
+                        };
+                        match create_symlink(&to) {
+                            Err(e) if force && e.kind() == io::ErrorKind::AlreadyExists => {
+                                let parent = to.parent().unwrap_or_else(|| Path::new("."));
+                                let tmp_path = loop {
+                                    let candidate = parent.join(format!(
+                                        ".fuc-symlink-{}-{}",
+                                        std::process::id(),
+                                        TMP_SYMLINK_COUNTER.fetch_add(1, Ordering::Relaxed),
+                                    ));
+                                    match create_symlink(&candidate) {
+                                        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                                            continue;
+                                        }
+                                        Ok(()) => break candidate,
+                                        Err(e) => return Err(e),
+                                    }
+                                };
+                                if let Err(e) = fs::rename(&tmp_path, &to) {
+                                    let _ = fs::remove_file(&tmp_path);
+                                    return Err(e);
+                                }
+                            }
+                            r => r?,
                         }
                     }
                 } else if hard_link {
